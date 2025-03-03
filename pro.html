@@ -484,7 +484,7 @@ if (file) reader.readAsText(file);
 function generatePrompt() {
 const extraInput = document.getElementById('prompt-input').value.trim();
 const points = extraInput ? extraInput : "the points above";
-const promptText = `Craft 50 positive detailed reviews based on ${points} 
+const promptText = `${points} Craft 50 positive detailed reviews based on the above context 
 Requirements:
 - The sentence structure and phrasing of each review should be unique (different from each other)
 - The main goal is to not sound repetitive
