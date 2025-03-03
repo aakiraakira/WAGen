@@ -1,0 +1,93 @@
+body {
+    font-family: 'Open Sans', sans-serif;
+    background-color: #f0f4f8;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 90%;
+    max-width: 800px;
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.input-container, .output-container, .actions-container, .stats-container {
+    margin-bottom: 20px;
+}
+
+textarea, input[type="text"], input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #dfe3e8;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+/* Action buttons styling */
+button.action-btn {
+    background-color: #3498db;
+    color: white;
+    padding: 10px 20px;
+    margin-right: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button.action-btn:hover {
+    background-color: #2980b9;
+}
+
+/* Individual review output styling */
+.output {
+    background-color: #f7f8fa;
+    border: 1px solid #ececec;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+
+    /* Use flex to position text and button horizontally */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Mark “done” reviews with green background */
+.output.done {
+    background-color: #dff0d8;
+}
+
+/* Buttons for copying or marking done */
+.copy-btn, .done-btn {
+    padding: 8px 12px;
+    margin-left: 10px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.copy-btn:hover, .done-btn:hover {
+    background-color: #45a049;
+}
+
+/* Stats container styling */
+.stats-container {
+    font-weight: bold;
+    text-align: center;
+    font-size: 18px;
+    background-color: #f7f8fa;
+    padding: 10px;
+    border-radius: 8px;
+}

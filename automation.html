@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Separator</title>
+    <!-- Link to the external CSS file -->
+    <link rel="stylesheet" href="automationstyles.css">
+</head>
+<body>
+
+    <div class="container">
+        <!-- Actions buttons on top -->
+        <div class="actions-container">
+            <!-- New button: Copy Latest Undone -->
+            <button class="action-btn" onclick="copyLatestUndoneReview()">Copy Latest Undone</button>
+            
+            <button class="action-btn" onclick="generateOutputs()">Generate</button>
+            <button class="action-btn" onclick="downloadJSON()">Download JSON</button>
+            <input type="file" id="file-input" accept=".json" onchange="loadFile(event)" />
+        </div>
+
+        <div class="input-container">
+            <textarea id="reviews-input" placeholder="Enter reviews here..."></textarea>
+            <input type="text" id="review-link" placeholder="Enter review link...">
+        </div>
+
+        <div class="output-container" id="output-container"></div>
+
+        <div class="stats-container" id="stats-container">
+            Total Reviews: 0 | Done Reviews: 0
+        </div>
+    </div>
+
+    <!-- Link to the external JavaScript file -->
+    <script src="automationscript.js"></script>
+</body>
+</html>

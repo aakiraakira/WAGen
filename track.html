@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Review Tracker</title>
+    <link rel="stylesheet" href="trackstyles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Company Review Tracker</h1>
+        <input type="text" id="search-box" onkeyup="debounce(searchCompanies, 300)()" placeholder="Search for companies..." class="search-box">
+        <div class="controls">
+            <!--<button onclick="addCompany()" class="button primary">Add Company</button>-->
+            <button onclick="copyDataToCSV(false)" class="button secondary">Copy Data to CSV</button>
+            <button onclick="resetDailyCounts()" class="button secondary">Reset Daily Count</button> <!-- Reset Daily Counts Button -->
+            <button onclick="calculateDailyTotal()" class="button secondary">Your Pay</button>
+            <button onclick="listDailyReviews()" class="button secondary">Full Pay Breakdown</button> <!-- New Button -->
+
+
+        </div>
+        
+       
+        <div class="pay-controls">
+            <input type="number" id="pay-per-review" placeholder="Pay per review" class="input-field">
+            <button onclick="updatePayPerReview()" class="button secondary">Set Pay Per Review</button>
+        </div>
+        <div id="company-list" class="company-list">
+            <!-- Companies will be listed here -->
+        </div>
+        <div id="daily-summary" class="daily-summary">
+            <!-- Daily summary of total reviews and earnings -->
+        </div>
+        <div class="csv-controls">
+            <textarea id="csv-input" rows="5" placeholder="Paste CSV data here" class="textarea"></textarea>
+            <button onclick="loadDataFromCSV()" class="button secondary">Load Data from CSV</button>
+        </div>
+    </div>
+    <script src="trackscript.js"></script>
+</body>
+</html>

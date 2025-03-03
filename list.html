@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Prevent auto-zoom on mobile inputs -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Review Tracker</title>
+  <!-- Load Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Global Reset & Base Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #000;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .app-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background-color: #111;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    h1, h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    /* CSV Input Section */
+    .csv-input-container {
+      margin-bottom: 20px;
+    }
+    textarea.csv-input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 5px;
+      background-color: #222;
+      color: #fff;
+      resize: vertical;
+      min-height: 150px;
+      margin-bottom: 15px;
+      font-size: 1rem;
+    }
+    button {
+      background-color: #007AFF;
+      color: #fff;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+      font-size: 1rem;
+      margin-bottom: 15px;
+    }
+    button:hover {
+      background-color: #0051c7;
+      transform: translateY(-2px);
+    }
+    .toggle-btn {
+      background-color: #007AFF;
+      padding: 8px 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      font-size: 0.9rem;
+    }
+    /* CSV Output Section */
+    textarea.csv-output {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 5px;
+      background-color: #222;
+      color: #fff;
+      resize: vertical;
+      min-height: 150px;
+      font-size: 1rem;
+    }
+    /* Company Card Styles */
+    .company-card {
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background-color: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .company-card h3 {
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+    .company-data {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 0.9rem;
+    }
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    .today-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .today-container input[type="number"] {
+      width: 60px;
+      padding: 5px;
+      border: 1px solid #444;
+      border-radius: 3px;
+      background-color: #222;
+      color: #fff;
+    }
+    /* Done state: subtle light green with black text */
+    .done {
+      background-color: #d4edda !important;
+      color: #000 !important;
+    }
+    /* Multi-Company Manager Layout */
+    .multi-company-container {
+      margin-top: 20px;
+    }
+    .company-card .remove-btn {
+      align-self: flex-end;
+      background: none;
+      border: none;
+      color: red;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    /* Prevent auto-zoom on mobile by ensuring interactive elements have at least 16px font-size */
+    input, textarea, button {
+      font-size: 16px;
+    }
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      button {
+        font-size: 0.9rem;
+      }
+      .company-card {
+        font-size: 0.85rem;
+      }
+    }
+  </style>
+  <!-- Load Google Maps JavaScript API with Places Library using your API key -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initMap"></script>
+</head>
+<body>
+  <div class="app-container">
+    <h1>Review Tracker</h1>
+
+    <!-- CSV Input Section (Toggleable) -->
+    <div id="csvInputSection" class="csv-input-container">
+      <h2>Paste CSV Data</h2>
+      <textarea id="csvInput" class="csv-input" placeholder="Paste your CSV data here (tab-delimited)..."></textarea>
+      <button onclick="processCSV()">Process CSV</button>
+    </div>
+    <div style="display:flex; gap:10px; justify-content: center; margin-bottom:20px;">
+      <button class="toggle-btn" onclick="toggleCSVInput()">Hide CSV Input</button>
+      <button class="toggle-btn" onclick="sortCompaniesByReviewsLeft()">Sort by Reviews Left</button>
+    </div>
+
+    <!-- Multi-Company Manager Display -->
+    <div class="multi-company-container">
+      <h2>Multi-Company Manager (w/ Local Storage)</h2>
+      <button class="action-btn" onclick="addCompany()">+ Add Company</button>
+      <button class="action-btn" onclick="clearLocalStorage()">Clear All Data</button>
+      <div id="companyCardsContainer"></div>
+      <button class="action-btn" onclick="generateOutputCSV()">Generate Output CSV & Show Payment</button>
+    </div>
+
+    <!-- CSV Output Section -->
+    <div class="csv-output-container">
+      <h2>Output CSV</h2>
+      <textarea id="csvOutput" class="csv-output" readonly placeholder="Updated CSV output will appear here..."></textarea>
+      <button class="action-btn" onclick="copyOutputCSV()">Copy CSV to Clipboard</button>
+    </div>
+  </div>
+
+  <script>
+    // Global array to store company data objects.
+    // Expected CSV columns: Company Name, Quantity for Today, Total Done, Total Reviews Ordered, Starting Count, Ending Count, Reviews Left
+    // We'll also add "Today's Count" (default 0)
+    let companies = [];
+    // For input processing, we assume 7 columns (as per CSV input), but output CSV will have an extra empty column between Ending Count and Reviews Left.
+    const inputHeaders = ["Company Name", "Quantity for Today", "Total Done", "Total Reviews Ordered", "Starting Count", "Ending Count", "Reviews Left"];
+
+    // Toggle the CSV Input Section visibility
+    function toggleCSVInput() {
+      const section = document.getElementById('csvInputSection');
+      section.style.display = section.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Process CSV data from textarea (tab-delimited, 7 columns)
+    function processCSV() {
+      const csvText = document.getElementById("csvInput").value;
+      if (!csvText.trim()) {
+        alert("Please paste CSV data first.");
+        return;
+      }
+      const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
+      if (lines.length < 2) {
+        alert("Not enough data.");
+        return;
+      }
+      companies = [];
+      // Skip header line; use our inputHeaders for order.
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split("\t");
+        let companyObj = {};
+        inputHeaders.forEach((header, index) => {
+          companyObj[header] = cols[index] ? cols[index].trim() : "";
+        });
+        // Only include companies with "(D)" in the Company Name
+        if (companyObj["Company Name"].includes("(D)")) {
+          companyObj["Today's Count"] = 0;
+          companies.push(companyObj);
+        }
+      }
+      if (companies.length === 0) {
+        alert("No companies with '(D)' found.");
+        return;
+      }
+      renderCompanyCards();
+      saveData();
+    }
+
+    // Render each company as a portrait card with live-updating values.
+    function renderCompanyCards() {
+      const container = document.getElementById("companyCardsContainer");
+      container.innerHTML = "";
+      companies.forEach((comp, idx) => {
+        // Compute live values: Total Done + Today's Count, and Reviews Left = Total Reviews Ordered - (Total Done + Today's Count)
+        const baseTotalDone = parseInt(comp["Total Done"]) || 0;
+        const todaysCount = parseInt(comp["Today's Count"]) || 0;
+        const newTotalDone = baseTotalDone + todaysCount;
+        const totalOrdered = parseInt(comp["Total Reviews Ordered"]) || 0;
+        const newReviewsLeft = totalOrdered - newTotalDone;
+        // Create company card
+        const card = document.createElement("div");
+        card.className = "company-card";
+        card.id = "company-card-" + idx;
+        // Remove button
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove-btn";
+        removeBtn.textContent = "×";
+        removeBtn.onclick = (e) => { e.stopPropagation(); removeCompany(idx); };
+        card.appendChild(removeBtn);
+        // Company Name
+        const name = document.createElement("h3");
+        name.textContent = comp["Company Name"];
+        card.appendChild(name);
+        // Data rows: Quantity for Today, Total Done, Total Reviews Ordered, Reviews Left
+        const dataDiv = document.createElement("div");
+        dataDiv.className = "company-data";
+        const fields = [
+          { label: "Quantity for Today", value: comp["Quantity for Today"] },
+          { label: "Total Done", value: newTotalDone },
+          { label: "Total Reviews Ordered", value: comp["Total Reviews Ordered"] },
+          { label: "Reviews Left", value: newReviewsLeft }
+        ];
+        fields.forEach(field => {
+          const row = document.createElement("div");
+          row.className = "data-row";
+          row.innerHTML = `<strong>${field.label}:</strong> ${field.value}`;
+          dataDiv.appendChild(row);
+        });
+        card.appendChild(dataDiv);
+        // Today's Count with plus/minus buttons
+        const todayDiv = document.createElement("div");
+        todayDiv.className = "today-container";
+        todayDiv.innerHTML = `<strong>Today's Count:</strong> `;
+        const todayInput = document.createElement("input");
+        todayInput.type = "number";
+        todayInput.value = comp["Today's Count"];
+        todayInput.min = "0";
+        todayInput.readOnly = true;
+        todayInput.id = "today_" + idx;
+        todayDiv.appendChild(todayInput);
+        const plusBtn = document.createElement("button");
+        plusBtn.textContent = "+";
+        plusBtn.onclick = () => { increment(idx); };
+        const minusBtn = document.createElement("button");
+        minusBtn.textContent = "−";
+        minusBtn.onclick = () => { decrement(idx); };
+        todayDiv.appendChild(plusBtn);
+        todayDiv.appendChild(minusBtn);
+        card.appendChild(todayDiv);
+        container.appendChild(card);
+      });
+    }
+
+    // Increment Today's Count and update card live.
+    function increment(idx) {
+      companies[idx]["Today's Count"] = parseInt(companies[idx]["Today's Count"]) + 1;
+      renderCompanyCards();
+      saveData();
+    }
+
+    // Decrement Today's Count (not below zero) and update card live.
+    function decrement(idx) {
+      let count = parseInt(companies[idx]["Today's Count"]);
+      if (count > 0) {
+        companies[idx]["Today's Count"] = count - 1;
+        renderCompanyCards();
+        saveData();
+      }
+    }
+
+    // Sort companies by Reviews Left (ascending, based on live computed value)
+    function sortCompaniesByReviewsLeft() {
+      companies.sort((a, b) => {
+        const aTotal = (parseInt(a["Total Done"]) || 0) + (parseInt(a["Today's Count"]) || 0);
+        const bTotal = (parseInt(b["Total Done"]) || 0) + (parseInt(b["Today's Count"]) || 0);
+        const aLeft = (parseInt(a["Total Reviews Ordered"]) || 0) - aTotal;
+        const bLeft = (parseInt(b["Total Reviews Ordered"]) || 0) - bTotal;
+        return aLeft - bLeft;
+      });
+      renderCompanyCards();
+      saveData();
+    }
+
+    // Generate output CSV after auto-applying daily counts and calculating payment.
+    // Output CSV: 8 columns: Company Name, Quantity for Today, Total Done, Total Reviews Ordered, Starting Count, Ending Count, (empty), Reviews Left.
+    function generateOutputCSV() {
+      let totalReviewsToday = 0;
+      companies.forEach(comp => {
+        let today = parseInt(comp["Today's Count"]) || 0;
+        totalReviewsToday += today;
+        let baseDone = parseInt(comp["Total Done"]) || 0;
+        baseDone += today;
+        comp["Total Done"] = baseDone;
+        let totalOrdered = parseInt(comp["Total Reviews Ordered"]) || 0;
+        comp["Reviews Left"] = totalOrdered - baseDone;
+        comp["Today's Count"] = 0; // Reset daily count
+      });
+      renderCompanyCards();
+      saveData();
+      const payment = (totalReviewsToday * 1.5).toFixed(2);
+      alert(`Daily totals applied!\nTotal reviews today: ${totalReviewsToday}\nAmount due: $${payment}`);
+      // Build CSV output with extra empty column (column G)
+      const outputHeaders = ["Company Name", "Quantity for Today", "Total Done", "Total Reviews Ordered", "Starting Count", "Ending Count", "", "Reviews Left"];
+      let csv = outputHeaders.join("\t") + "\n";
+      companies.forEach(comp => {
+        // Create a row with an empty field for column G
+        let row = [
+          comp["Company Name"],
+          comp["Quantity for Today"],
+          comp["Total Done"],
+          comp["Total Reviews Ordered"],
+          comp["Starting Count"],
+          comp["Ending Count"],
+          "", // empty column
+          comp["Reviews Left"]
+        ].join("\t");
+        csv += row + "\n";
+      });
+      document.getElementById("csvOutput").value = csv;
+    }
+
+    // Copy CSV output to clipboard
+    function copyOutputCSV() {
+      const csvText = document.getElementById("csvOutput").value;
+      if (!csvText.trim()) {
+        alert("No CSV output to copy. Please click 'Generate Output CSV & Show Payment' first.");
+        return;
+      }
+      copyToClipboard(csvText);
+    }
+
+    // Generic copy function with Clipboard API (and fallback with haptic feedback)
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          if (navigator.vibrate) { navigator.vibrate(100); }
+        }).catch(err => { fallbackCopy(text); });
+      } else {
+        fallbackCopy(text);
+      }
+    }
+    function fallbackCopy(text) {
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = text;
+      tempTextArea.style.position = 'fixed';
+      tempTextArea.style.top = '-9999px';
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      try { document.execCommand('copy'); }
+      catch (err) { console.error('Fallback copy failed', err); }
+      document.body.removeChild(tempTextArea);
+      if (navigator.vibrate) { navigator.vibrate(100); }
+    }
+
+    // Auto-save companies data to localStorage
+    function saveData() {
+      try {
+        localStorage.setItem('reviewTrackerData', JSON.stringify(companies));
+      } catch (e) {
+        console.error("Error saving data: ", e);
+      }
+    }
+
+    // Load companies data from localStorage
+    function loadData() {
+      const data = localStorage.getItem('reviewTrackerData');
+      if (data) {
+        try {
+          companies = JSON.parse(data);
+          renderCompanyCards();
+        } catch (e) {
+          console.error("Error loading data: ", e);
+        }
+      }
+    }
+
+    // Remove a company by index
+    function removeCompany(index) {
+      if (confirm("Are you sure you want to remove this company?")) {
+        companies.splice(index, 1);
+        renderCompanyCards();
+        saveData();
+      }
+    }
+
+    // Dummy functions for addCompany and clearLocalStorage if not already defined
+    function addCompany() {
+      alert("Add Company function is not implemented in this snippet.");
+    }
+    function clearLocalStorage() {
+      if (confirm("Are you sure you want to clear all data?")) {
+        localStorage.removeItem('reviewTrackerData');
+        companies = [];
+        renderCompanyCards();
+      }
+    }
+
+    // Save data automatically before the page unloads
+    window.addEventListener('beforeunload', saveData);
+
+    // Load data on page load
+    window.onload = () => { loadData(); };
+  </script>
+</body>
+</html>
