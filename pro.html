@@ -150,7 +150,6 @@
       margin-bottom: 8px;
     }
     /* Map container for Place ID Finder */
-    /* Place search bar positioned above map */
     .place-finder .search-container {
       margin-bottom: 12px;
     }
@@ -168,14 +167,6 @@
       padding: 12px;
       margin-bottom: 12px;
       white-space: pre-wrap;
-    }
-    .place-finder .fallback-link {
-      text-align: center;
-      margin-top: 10px;
-    }
-    .place-finder .fallback-link a {
-      color: #007AFF;
-      text-decoration: underline;
     }
     /* Multi-Company Manager Styles */
     .multi-company-container h2 {
@@ -278,24 +269,15 @@
     <div id="place" class="tab-content">
       <h1>Place ID Finder</h1>
       <div class="place-finder">
-        <!-- Search Bar placed above the map -->
+        <!-- Single Search Field above the map -->
         <div class="search-container">
           <label for="pac-input">Search for your company:</label>
           <input type="text" id="pac-input" placeholder="Enter a company name" />
         </div>
         <div id="map"></div>
-        <label for="pac-input">Search for your company:</label>
-        <input type="text" id="pac-input" placeholder="Enter a company name" />
         <label>Generated Review Link:</label>
         <div id="place-output" class="output-area"></div>
         <button class="action-btn" onclick="copyPlaceLink()">Copy Link</button>
-        <hr style="border: 1px solid #444; margin: 12px 0;">
-        <label for="manual-place-id">Or enter Place ID manually:</label>
-        <input type="text" id="manual-place-id" placeholder="Enter Place ID" />
-        <button class="action-btn" onclick="generateManualLink()">Generate Review Link</button>
-        <div class="fallback-link">
-          <a href="https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder" target="_blank">Need help obtaining Place ID?</a>
-        </div>
         <!-- Google Sheet Row Generator Section -->
         <hr style="border: 1px solid #444; margin: 12px 0;">
         <h2>Google Sheet Row Generator</h2>
@@ -433,7 +415,7 @@
       document.getElementById('single-stats-container').textContent = `Total Reviews: ${total} | Done Reviews: ${done}`;
     }
 
-    // Modified to prompt for file name before download.
+    // Prompt for file name before download.
     function downloadSingleJSON() {
       const outputs = document.querySelectorAll('#single-output-container .output');
       const reviewData = Array.from(outputs).map(output => {
@@ -530,7 +512,7 @@ content 2`;
     }
 
     /**************** PLACE ID FINDER ****************/
-    // Initialize the map with Places Autocomplete and store extra fields.
+    // Single initMap function for the Place ID Finder.
     function initMap() {
       const map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: -33.8688, lng: 151.2195 },
@@ -564,16 +546,6 @@ content 2`;
       });
     }
 
-    function generateManualLink() {
-      const manualId = document.getElementById('manual-place-id').value.trim();
-      if (manualId) {
-        const reviewLink = "https://search.google.com/local/writereview?placeid=" + manualId;
-        document.getElementById("place-output").textContent = reviewLink;
-      } else {
-        alert("Please enter a valid Place ID.");
-      }
-    }
-
     function copyPlaceLink() {
       const placeLink = document.getElementById("place-output").textContent;
       if (placeLink) {
@@ -597,12 +569,12 @@ content 2`;
       const tDone = parseInt(totalDone, 10) || 0;
       const rOrdered = parseInt(reviewsOrdered, 10) || 0;
 
-      // Calculate ending count and difference.
+      // Calculate ending count and reviews left (row d - row c).
       const endingCount = selectedStartingCount + rOrdered;
-      const diff = rOrdered - tDone;
+      const reviewsLeft = rOrdered - tDone;
       // Construct the row exactly as: 
       // Company Name	Today Qty	Total Done	Reviews Ordered	Starting Count	Ending Count		(Reviews Ordered - Total Done)
-      const sheetRow = `${selectedCompanyName}\t${qToday}\t${tDone}\t${rOrdered}\t${selectedStartingCount}\t${endingCount}\t\t${diff}`;
+      const sheetRow = `${selectedCompanyName}\t${qToday}\t${tDone}\t${rOrdered}\t${selectedStartingCount}\t${endingCount}\t\t${reviewsLeft}`;
       document.getElementById('sheet-output').textContent = sheetRow;
     }
 
