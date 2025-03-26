@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+ <html lang="en">
+ <head>
+   <meta charset="UTF-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+   <title>Multi-Company Review Manager with Persistence</title>
+ 
+   <style>
+     /* Basic Reset */
+     * {
+       box-sizing: border-box;
+       margin: 0;
+       padding: 0;
+     }
+ 
+     body {
+       font-family: 'Open Sans', sans-serif;
+       background-color: #f0f4f8;
+       color: #333;
+       margin: 0;
+       min-height: 100vh;
+       display: flex;
+       flex-direction: column;
+     }
+ 
+     header {
+       background-color: #3498db;
+       color: #fff;
+       padding: 20px;
+       text-align: center;
+       font-size: 1.5rem;
+     }
+ 
+     .container {
+       width: 90%;
+       max-width: 1200px;
+       margin: 20px auto;
+       background-color: #ffffff;
+       padding: 20px;
+       border-radius: 8px;
+       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+       display: flex;
+       flex-direction: column;
+       gap: 20px;
+     }
+ 
+     /* Tabs Container */
+     .tabs-container {
+       display: flex;
+       flex-wrap: wrap;
+       gap: 10px;
+     }
+ 
+     .tab-button {
+       background-color: #ececec;
+       border: none;
+       border-radius: 5px;
+       padding: 10px 15px;
+       cursor: pointer;
+       transition: background-color 0.3s ease;
+     }
+ 
+     .tab-button.active {
+       background-color: #3498db;
+       color: #fff;
+     }
+ 
+     .tab-button:hover {
+       background-color: #cfcfcf;
+     }
+ 
+     /* Action buttons styling */
+     .actions-container {
+       display: flex;
+       flex-wrap: wrap;
+       gap: 10px;
+     }
+ 
+     button.action-btn {
+       background-color: #3498db;
+       color: white;
+       padding: 10px 20px;
+       border: none;
+       border-radius: 5px;
+       cursor: pointer;
+       transition: background-color 0.3s ease;
+     }
+ 
+     button.action-btn:hover {
+       background-color: #2980b9;
+     }
+ 
+     /* Each company's content container (hidden or shown) */
+     .company-container {
+       display: none; /* We will switch to display: flex for the active one */
+       flex-direction: column;
+       gap: 20px;
+     }
+ 
+     .company-container.active {
+       display: flex;
+     }
+ 
+     /* Input container styling */
+     .input-container {
+       display: flex;
+       flex-direction: column;
+       gap: 10px;
+     }
+ 
+     textarea,
+     input[type="text"] {
+       width: 100%;
+       padding: 12px;
+       border: 1px solid #dfe3e8;
+       border-radius: 5px;
+       background-color: #f9f9f9;
+     }
+ 
+     input[type="file"] {
+       padding: 5px 0;
+     }
+ 
+     /* Individual review output styling */
+     .output-container {
+       margin-top: 10px;
+       display: flex;
+       flex-direction: column;
+       gap: 10px;
+     }
+ 
+     .output {
+       background-color: #f7f8fa;
+       border: 1px solid #ececec;
+       padding: 12px;
+       margin-bottom: 5px;
+       border-radius: 5px;
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+     }
+ 
+     /* Mark “done” reviews with green background */
+     .output.done {
+       background-color: #dff0d8;
+     }
+ 
+     .output p {
+       margin: 0;
+       padding-right: 10px;
+     }
+ 
+     /* Copy/Done buttons */
+     .copy-btn,
+     .done-btn {
+       padding: 8px 12px;
+       margin-left: 10px;
+       background-color: #4caf50;
+       color: white;
+       border: none;
+       border-radius: 5px;
+       cursor: pointer;
+     }
+ 
+     .copy-btn:hover,
+     .done-btn:hover {
+       background-color: #45a049;
+     }
+ 
+     /* Stats container styling */
+     .stats-container {
+       font-weight: bold;
+       text-align: center;
+       font-size: 18px;
+       background-color: #f7f8fa;
+       padding: 10px;
+       border-radius: 8px;
+     }
+ 
+     /* Mobile responsiveness */
+     @media (max-width: 768px) {
+       .actions-container {
+         flex-direction: column;
+       }
+ 
+       .output {
+         flex-direction: column;
+         align-items: flex-start;
+         gap: 10px;
+       }
+ 
+       .tabs-container {
+         flex-direction: column;
+       }
+     }
+   </style>
+ </head>
+ <body>
+ 
+   <header>
+     Multi-Company Review Manager (w/ Local Storage)
+   </header>
+ 
+   <div class="container">
+ 
+     <!-- Tab Buttons (Dynamic) -->
+     <div class="tabs-container" id="tabs-container">
+       <!-- Will be populated dynamically with addCompany() -->
+     </div>
+ 
+     <!-- Button to add new company tab -->
+     <div class="actions-container">
+       <button class="action-btn" onclick="addCompany()">+ Add Company Tab</button>
+       <button class="action-btn" onclick="clearLocalStorage()">Clear Local Data</button>
+     </div>
+ 
+     <div id="companies-wrapper">
+       <!-- Dynamically populated by addCompany() or loadFromLocalStorage() -->
+     </div>
+ 
+   </div>
+ 
+   <script>
+     /*********************************************************
+      * GLOBAL DATA & STATE 
+      *********************************************************/
+     let companiesData = []; 
+     // Each element in companiesData will have the structure:
+     // {
+     //   companyName: string,
+     //   reviews: [ { text, link, status }, ... ],
+     //   containerEl: reference to the .company-container DOM,
+     // }
+ 
+     let currentCompanyIndex = -1; // Index of the currently active company
+ 
+     /*********************************************************
+      * LOCAL STORAGE PERSISTENCE
+      *********************************************************/
+     // Save the entire companiesData array to localStorage
+     function saveToLocalStorage() {
+       try {
+         const dataString = JSON.stringify(companiesData);
+         localStorage.setItem('companiesData', dataString);
+       } catch (err) {
+         console.error('Error saving to localStorage:', err);
+       }
+     }
+ 
+     // Load from localStorage and rebuild the UI
+     function loadFromLocalStorage() {
+       const dataString = localStorage.getItem('companiesData');
+       if (!dataString) return; // No saved data
+ 
+       try {
+         const parsed = JSON.parse(dataString);
+         if (Array.isArray(parsed)) {
+           companiesData = parsed;
+           // We now re-create the DOM for each company
+           companiesData.forEach((company, index) => {
+             // We need to create the tab button & container
+             createCompanyTabButton(index, company.companyName);
+             createCompanyContainer(index);
+ 
+             // Re-render reviews
+             renderCompanyOutputs(index);
+           });
+ 
+           // If there's at least 1 company, let's select the first one by default
+           if (companiesData.length > 0) {
+             selectCompany(0);
+           }
+         }
+       } catch (err) {
+         console.error('Error parsing localStorage data:', err);
+       }
+     }
+ 
+     // Clear local data
+     function clearLocalStorage() {
+       localStorage.removeItem('companiesData');
+       // Optionally reload the page to start fresh
+       // or just reset the data in memory
+       companiesData = [];
+       currentCompanyIndex = -1;
+       document.getElementById('tabs-container').innerHTML = '';
+       document.getElementById('companies-wrapper').innerHTML = '';
+       alert("Local data cleared.");
+     }
+ 
+     // Before unload, automatically save
+     window.addEventListener('beforeunload', (event) => {
+       saveToLocalStorage();
+     });
+ 
+     /*********************************************************
+      * HELPER FUNCTIONS
+      *********************************************************/
+ 
+     // Switch the "active" class on tab buttons and company containers
+     function selectCompany(index) {
+       // Deactivate old
+       if (currentCompanyIndex >= 0 && companiesData[currentCompanyIndex]) {
+         const oldTabButton = document.getElementById(`tab-btn-${currentCompanyIndex}`);
+         const oldContainer = companiesData[currentCompanyIndex].containerEl;
+         if (oldTabButton) oldTabButton.classList.remove('active');
+         if (oldContainer) oldContainer.classList.remove('active');
+       }
+ 
+       // Activate new
+       currentCompanyIndex = index;
+       const newTabButton = document.getElementById(`tab-btn-${index}`);
+       const newContainer = companiesData[index].containerEl;
+       if (newTabButton) newTabButton.classList.add('active');
+       if (newContainer) newContainer.classList.add('active');
+ 
+       updateStats();
+     }
+ 
+     // Create a tab button in the tabs-container
+     function createCompanyTabButton(companyIndex, companyName) {
+       const tabsContainer = document.getElementById('tabs-container');
+       const tabButton = document.createElement('button');
+       tabButton.className = 'tab-button';
+       tabButton.id = `tab-btn-${companyIndex}`;
+       tabButton.textContent = companyName;
+       tabButton.onclick = () => selectCompany(companyIndex);
+       tabsContainer.appendChild(tabButton);
+     }
+ 
+     // Create a company-container in companies-wrapper
+     function createCompanyContainer(companyIndex) {
+       const companiesWrapper = document.getElementById('companies-wrapper');
+       const companyContainer = document.createElement('div');
+       companyContainer.className = 'company-container';
+       companyContainer.id = `company-container-${companyIndex}`;
+ 
+       companyContainer.innerHTML = `
+         <div class="actions-container">
+           <!-- Copy Latest Undone -->
+           <button class="action-btn" onclick="copyLatestUndoneReview(${companyIndex})">
+             Copy Latest Undone
+           </button>
+           <!-- Generate -->
+           <button class="action-btn" onclick="generateOutputs(${companyIndex})">
+             Generate
+           </button>
+           <!-- Download JSON -->
+           <button class="action-btn" onclick="downloadJSON(${companyIndex})">
+             Download JSON
+           </button>
+           <!-- Multiple file input -->
+           <input type="file" id="file-input-${companyIndex}" accept=".json" multiple onchange="loadFiles(event, ${companyIndex})" />
+         </div>
+ 
+         <div class="input-container">
+           <textarea id="reviews-input-${companyIndex}" placeholder="Enter reviews here..."></textarea>
+           <input type="text" id="review-link-${companyIndex}" placeholder="Enter review link...">
+         </div>
+ 
+         <div class="output-container" id="output-container-${companyIndex}"></div>
+ 
+         <div class="stats-container" id="stats-container-${companyIndex}">
+           Total Reviews: 0 | Done Reviews: 0
+         </div>
+       `;
+ 
+       companiesWrapper.appendChild(companyContainer);
+ 
+       // Store reference
+       companiesData[companyIndex].containerEl = companyContainer;
+     }
+ 
+     // Copy text to the clipboard
+     function copyToClipboard(text) {
+       const tempTextArea = document.createElement('textarea');
+       tempTextArea.value = text;
+       document.body.appendChild(tempTextArea);
+       tempTextArea.select();
+       document.execCommand('copy');
+       document.body.removeChild(tempTextArea);
+     }
+ 
+     // Mark a given .output div as done
+     function markAsDone(outputDiv) {
+       outputDiv.classList.add('done');
+     }
+ 
+     // Utility to create an output DOM element for a given review object
+     function createReviewOutput(review, reviewIndex, companyIndex) {
+       const outputDiv = document.createElement('div');
+       outputDiv.className = 'output';
+       outputDiv.id = `output-${companyIndex}-${reviewIndex}`;
+ 
+       // If it's done, add the done class
+       if (review.status === 'done') {
+         outputDiv.classList.add('done');
+       }
+ 
+       // Link display
+       const linkElement = document.createElement('p');
+       linkElement.innerHTML = `Click: <a href="${review.link}" target="_blank">${review.link}</a>`;
+       outputDiv.appendChild(linkElement);
+ 
+       // Review text
+       const reviewElement = document.createElement('p');
+       reviewElement.textContent = review.text;
+       outputDiv.appendChild(reviewElement);
+ 
+       // Copy button
+       const copyButton = document.createElement('button');
+       copyButton.className = 'copy-btn';
+       copyButton.textContent = 'Copy';
+       copyButton.onclick = () => {
+         copyToClipboard(`Click: ${review.link}\n\n${review.text}`);
+         markAsDone(outputDiv);
+         review.status = 'done';  // Update data model
+         updateStats();
+         saveToLocalStorage();    // Save to localStorage each time data changes
+       };
+       outputDiv.appendChild(copyButton);
+ 
+       return outputDiv;
+     }
+ 
+     /*********************************************************
+      * CORE FUNCTIONALITY
+      *********************************************************/
+ 
+     // Add a new company "tab" and container
+     function addCompany() {
+       let companyName = prompt("Enter the Company Name:", `Company ${companiesData.length + 1}`);
+       if (!companyName) {
+         companyName = `Company ${companiesData.length + 1}`;
+       }
+ 
+       const newCompanyIndex = companiesData.length;
+       const newCompanyData = {
+         companyName: companyName,
+         reviews: [],
+         containerEl: null
+       };
+       companiesData.push(newCompanyData);
+ 
+       // Create tab button & container
+       createCompanyTabButton(newCompanyIndex, companyName);
+       createCompanyContainer(newCompanyIndex);
+ 
+       // Select newly created company
+       selectCompany(newCompanyIndex);
+ 
+       // Immediately save to localStorage so the new tab is remembered
+       saveToLocalStorage();
+     }
+ 
+     // Generate outputs for a specific company
+     function generateOutputs(companyIndex) {
+       const reviewLink = document.getElementById(`review-link-${companyIndex}`).value;
+       const reviewsInput = document.getElementById(`reviews-input-${companyIndex}`).value;
+       const outputContainer = document.getElementById(`output-container-${companyIndex}`);
+ 
+       // Split on blank lines
+       const splittedReviews = reviewsInput.split(/\n\n/).filter((rev) => rev.trim() !== "");
+ 
+       // For each splitted review, create an object and append
+       splittedReviews.forEach((reviewText) => {
+         const reviewObj = {
+           text: reviewText,
+           link: reviewLink,
+           status: 'undone'
+         };
+         companiesData[companyIndex].reviews.push(reviewObj);
+       });
+ 
+       // Re-render
+       renderCompanyOutputs(companyIndex);
+ 
+       // Clear input box (optional)
+       document.getElementById(`reviews-input-${companyIndex}`).value = "";
+ 
+       updateStats();
+       saveToLocalStorage();
+     }
+ 
+     // Re-render a given company's outputs from companiesData
+     function renderCompanyOutputs(companyIndex) {
+       const outputContainer = document.getElementById(`output-container-${companyIndex}`);
+       outputContainer.innerHTML = "";
+ 
+       // Loop through reviews
+       companiesData[companyIndex].reviews.forEach((reviewObj, index) => {
+         const outputDiv = createReviewOutput(reviewObj, index, companyIndex);
+         outputContainer.appendChild(outputDiv);
+       });
+     }
+ 
+     // Update the stats (Total reviews / Done reviews) for the currently active company 
+     function updateStats() {
+       if (currentCompanyIndex < 0) return;
+       const companyData = companiesData[currentCompanyIndex];
+       const totalReviews = companyData.reviews.length;
+       const doneReviews = companyData.reviews.filter((r) => r.status === 'done').length;
+       const statsContainer = document.getElementById(`stats-container-${currentCompanyIndex}`);
+ 
+       statsContainer.textContent = `Total Reviews: ${totalReviews} | Done Reviews: ${doneReviews}`;
+     }
+ 
+     // Download JSON for a specific company
+     function downloadJSON(companyIndex) {
+       const companyData = companiesData[companyIndex];
+       const reviewData = companyData.reviews.map((item) => {
+         return {
+           reviewText: item.text,
+           reviewLink: item.link,
+           status: item.status
+         };
+       });
+       const data = JSON.stringify(reviewData, null, 2);
+       const blob = new Blob([data], { type: 'application/json' });
+       const url = URL.createObjectURL(blob);
+ 
+       const a = document.createElement('a');
+       a.href = url;
+       a.download = `${companyData.companyName.replace(/\s+/g, '_')}_reviews.json`;
+       a.click();
+       URL.revokeObjectURL(url);
+     }
+ 
+     // Load one or multiple .json files for a specific company
+     function loadFiles(event, companyIndex) {
+       const files = event.target.files;
+       if (!files.length) return;
+ 
+       for (let i = 0; i < files.length; i++) {
+         const file = files[i];
+         const reader = new FileReader();
+ 
+         reader.onload = function(e) {
+           try {
+             const jsonContent = JSON.parse(e.target.result);
+             jsonContent.forEach((item) => {
+               const newReviewObj = {
+                 text: item.reviewText || "",
+                 link: item.reviewLink || "",
+                 status: item.status === 'done' ? 'done' : 'undone'
+               };
+               companiesData[companyIndex].reviews.push(newReviewObj);
+             });
+             // Re-render
+             renderCompanyOutputs(companyIndex);
+             // If there's at least one review link, set the input field to that link
+             if (jsonContent.length > 0) {
+               document.getElementById(`review-link-${companyIndex}`).value = jsonContent[0].reviewLink || "";
+             }
+             updateStats();
+             saveToLocalStorage();
+           } catch (err) {
+             alert("Invalid JSON file!");
+           }
+         };
+         reader.readAsText(file);
+       }
+     }
+ 
+     /**
+      * Copy the latest undone review for a specific company index.
+      * If found, it copies "Click: {link}\n\n{reviewText}" to the clipboard,
+      * then marks that review as done and updates the stats.
+      */
+     function copyLatestUndoneReview(companyIndex) {
+       const companyData = companiesData[companyIndex];
+       const undoneReview = companyData.reviews.find((rev) => rev.status !== 'done');
+       if (undoneReview) {
+         copyToClipboard(`Click: ${undoneReview.link}\n\n${undoneReview.text}`);
+         undoneReview.status = 'done';
+         renderCompanyOutputs(companyIndex);
+         updateStats();
+         saveToLocalStorage();
+       } else {
+         alert('No undone reviews available to copy for this company!');
+       }
+     }
+ 
+     /*********************************************************
+      * INITIALIZATION
+      *********************************************************/
+     window.onload = () => {
+       // Attempt to load from localStorage on page load
+       loadFromLocalStorage();
+     };
+   </script>
+ </body>
+ </html>
