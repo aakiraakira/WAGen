@@ -2,12 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Prevent zooming on mobile devices (including iPhone) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Review Tracking Tool</title>
   <!-- Importing Inter Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     /* Global Styles */
+    html, body {
+      -webkit-text-size-adjust: 100%; /* Prevent font resizing on iOS */
+    }
     body {
       background-color: #000;
       color: #fff;
@@ -150,6 +154,7 @@
       container.innerHTML = '';
       
       lines.forEach(line => {
+        // Expected format: "Company Name - 0/X"
         const parts = line.split(' - ');
         if (parts.length === 2) {
           const name = parts[0].trim();
@@ -179,7 +184,9 @@
       const container = document.getElementById('companiesContainer');
       container.innerHTML = '';
       
+      // Filter companies that are not fully completed
       let filteredCompanies = companies.filter(c => c.currentReviews < c.totalReviews);
+      // Sort companies based on current review count
       filteredCompanies.sort((a, b) => sortAscending ? a.currentReviews - b.currentReviews : b.currentReviews - a.currentReviews);
       
       filteredCompanies.forEach(company => {
@@ -254,7 +261,7 @@
       return card;
     }
     
-    // Update card data when reviews change
+    // Update card when review counts change
     function updateCompanyCard(company, card) {
       const reviewText = card.querySelector('.review-text');
       reviewText.innerText = `Daily Reviews - ${company.currentReviews}/${company.totalReviews}`;
@@ -282,7 +289,7 @@
         totalEarnings += company.earnings;
       });
       message += "-------------------%0A";
-      message += `Total Earnings: $${totalEarnings.toFixed(2)}`;
+      message += `Amount to Pay: $${totalEarnings.toFixed(2)}`;
       
       const whatsappNumber = "6598287470";
       const whatsappLink = `https://wa.me/${whatsappNumber}?text=${message}`;
