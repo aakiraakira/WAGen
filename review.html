@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review Tracking Tool</title>
+  <!-- Importing Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* Global Styles */
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 15px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .blue-button {
+      background-color: #007AFF;
+      border: none;
+      color: #fff;
+      padding: 10px 15px;
+      margin: 5px 0;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+    }
+    /* Company Card Styles */
+    .company-card {
+      background-color: #111;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+    }
+    .company-card h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+    .button-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+    .button-container button {
+      width: 48%;
+    }
+    .progress-container {
+      background-color: #333;
+      border-radius: 5px;
+      height: 10px;
+      margin-top: 10px;
+      width: 100%;
+    }
+    .progress-bar {
+      background-color: #28a745; /* Green progress bar */
+      height: 100%;
+      border-radius: 5px;
+      width: 0%;
+    }
+    .sort-container {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sort-container span {
+      margin-right: 10px;
+    }
+    /* WhatsApp Output Link Styles */
+    #whatsappOutput {
+      margin-top: 20px;
+      text-align: center;
+    }
+    #whatsappLink {
+      display: inline-block;
+      margin-top: 10px;
+      text-decoration: none;
+      background-color: #007AFF;
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      .blue-button, #whatsappLink {
+        font-size: 14px;
+        padding: 10px;
+      }
+      .company-card h2 {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Review Tracking Tool</h1>
+      <!-- Input Area for Company Data -->
+      <textarea id="companyInput" placeholder="Enter companies in format: Company Name - 0/X (e.g.,&#10;SG Homes - 0/5&#10;BM Spa - 0/5&#10;JM Sons - 0/6)"></textarea>
+      <button id="generateCompanies" class="blue-button">Generate Companies</button>
+      <!-- Sort Button -->
+      <div class="sort-container">
+        <span>Sort by Reviews</span>
+        <button id="sortButton" class="blue-button" style="width:auto; padding: 10px 15px;">↕</button>
+      </div>
+    </header>
+    
+    <!-- Company Cards will be inserted here -->
+    <div id="companiesContainer"></div>
+    
+    <!-- WhatsApp Output Section -->
+    <div id="whatsappOutput">
+      <button id="generateOutput" class="blue-button">Generate WhatsApp Message</button>
+      <div id="whatsappLinkContainer"></div>
+    </div>
+  </div>
+  
+  <script>
+    let companies = [];
+    let sortAscending = true;
+    
+    // Generate companies from input
+    document.getElementById('generateCompanies').addEventListener('click', generateCompanies);
+    
+    function generateCompanies() {
+      const inputText = document.getElementById('companyInput').value;
+      const lines = inputText.split('\n').filter(line => line.trim() !== '');
+      companies = [];
+      const container = document.getElementById('companiesContainer');
+      container.innerHTML = '';
+      
+      lines.forEach(line => {
+        const parts = line.split(' - ');
+        if (parts.length === 2) {
+          const name = parts[0].trim();
+          const progressPart = parts[1].trim();
+          const progressNumbers = progressPart.split('/');
+          if (progressNumbers.length === 2) {
+            const current = parseInt(progressNumbers[0]);
+            const total = parseInt(progressNumbers[1]);
+            if (!isNaN(current) && !isNaN(total)) {
+              const company = {
+                name: name,
+                currentReviews: current,
+                totalReviews: total,
+                earnings: 0,
+                cardElement: null
+              };
+              companies.push(company);
+            }
+          }
+        }
+      });
+      renderCompanies();
+    }
+    
+    // Render companies (only those not fully completed)
+    function renderCompanies() {
+      const container = document.getElementById('companiesContainer');
+      container.innerHTML = '';
+      
+      let filteredCompanies = companies.filter(c => c.currentReviews < c.totalReviews);
+      filteredCompanies.sort((a, b) => sortAscending ? a.currentReviews - b.currentReviews : b.currentReviews - a.currentReviews);
+      
+      filteredCompanies.forEach(company => {
+        const card = createCompanyCard(company);
+        container.appendChild(card);
+        company.cardElement = card;
+      });
+    }
+    
+    // Create a card for each company
+    function createCompanyCard(company) {
+      const card = document.createElement('div');
+      card.className = 'company-card';
+      
+      const title = document.createElement('h2');
+      title.innerText = company.name;
+      card.appendChild(title);
+      
+      const reviewText = document.createElement('p');
+      reviewText.innerText = `Daily Reviews - ${company.currentReviews}/${company.totalReviews}`;
+      reviewText.className = 'review-text';
+      card.appendChild(reviewText);
+      
+      const earningsText = document.createElement('p');
+      earningsText.innerText = `Earnings: $${company.earnings.toFixed(2)}`;
+      earningsText.className = 'earnings-text';
+      card.appendChild(earningsText);
+      
+      // Progress Bar
+      const progressContainer = document.createElement('div');
+      progressContainer.className = 'progress-container';
+      const progressBar = document.createElement('div');
+      progressBar.className = 'progress-bar';
+      progressBar.style.width = `${(company.currentReviews / company.totalReviews) * 100}%`;
+      progressContainer.appendChild(progressBar);
+      card.appendChild(progressContainer);
+      
+      // Increment and Decrement Buttons
+      const buttonContainer = document.createElement('div');
+      buttonContainer.className = 'button-container';
+      
+      const minusButton = document.createElement('button');
+      minusButton.innerText = '-';
+      minusButton.className = 'blue-button';
+      minusButton.addEventListener('click', () => {
+        if (company.currentReviews > 0) {
+          company.currentReviews--;
+          company.earnings -= 1.50;
+          updateCompanyCard(company, card);
+        }
+      });
+      
+      const plusButton = document.createElement('button');
+      plusButton.innerText = '+';
+      plusButton.className = 'blue-button';
+      plusButton.addEventListener('click', () => {
+        if (company.currentReviews < company.totalReviews) {
+          company.currentReviews++;
+          company.earnings += 1.50;
+          updateCompanyCard(company, card);
+          // Hide card if fully completed
+          if (company.currentReviews === company.totalReviews) {
+            card.style.display = 'none';
+          }
+        }
+      });
+      
+      buttonContainer.appendChild(minusButton);
+      buttonContainer.appendChild(plusButton);
+      card.appendChild(buttonContainer);
+      
+      return card;
+    }
+    
+    // Update card data when reviews change
+    function updateCompanyCard(company, card) {
+      const reviewText = card.querySelector('.review-text');
+      reviewText.innerText = `Daily Reviews - ${company.currentReviews}/${company.totalReviews}`;
+      
+      const earningsText = card.querySelector('.earnings-text');
+      earningsText.innerText = `Earnings: $${company.earnings.toFixed(2)}`;
+      
+      const progressBar = card.querySelector('.progress-bar');
+      progressBar.style.width = `${(company.currentReviews / company.totalReviews) * 100}%`;
+    }
+    
+    // Toggle sort order and re-render companies
+    document.getElementById('sortButton').addEventListener('click', () => {
+      sortAscending = !sortAscending;
+      document.getElementById('sortButton').innerText = sortAscending ? '↑' : '↓';
+      renderCompanies();
+    });
+    
+    // Generate WhatsApp link with review progress output
+    document.getElementById('generateOutput').addEventListener('click', () => {
+      let message = "Review Progress:%0A-------------------%0A";
+      let totalEarnings = 0;
+      companies.forEach(company => {
+        message += `${company.name} - ${company.currentReviews}/${company.totalReviews} - Earnings: $${company.earnings.toFixed(2)}%0A`;
+        totalEarnings += company.earnings;
+      });
+      message += "-------------------%0A";
+      message += `Total Earnings: $${totalEarnings.toFixed(2)}`;
+      
+      const whatsappNumber = "6598287470";
+      const whatsappLink = `https://wa.me/${whatsappNumber}?text=${message}`;
+      
+      const linkContainer = document.getElementById('whatsappLinkContainer');
+      linkContainer.innerHTML = '';
+      
+      const link = document.createElement('a');
+      link.href = whatsappLink;
+      link.id = "whatsappLink";
+      link.target = "_blank";
+      link.innerText = "Send via WhatsApp";
+      linkContainer.appendChild(link);
+    });
+  </script>
+</body>
+</html>
