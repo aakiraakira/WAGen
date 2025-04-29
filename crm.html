@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Review CRM Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      padding: 2rem;
+      max-width: 800px;
+      margin: auto;
+      background: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+    }
+    #search-panel {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: 1.5rem;
+    }
+    #place-search {
+      flex: 1;
+      padding: .5rem;
+      font-size: 1rem;
+    }
+    #summary {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      margin-bottom: 1.5rem;
+    }
+    #reviews-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    .review-card {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    }
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: .5rem;
+      font-weight: 600;
+    }
+    .rating { color: #f5a623; }
+    label { font-weight: 600; margin-top: 1rem; }
+    input, button {
+      padding: .5rem;
+      font-size: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+      margin-top: .5rem;
+    }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h1>Review CRM Dashboard</h1>
+
+  <div id="search-panel">
+    <input id="place-search" placeholder="Type a business name…">
+    <button id="load-reviews">Load Reviews</button>
+  </div>
+
+  <div id="summary" hidden>
+    <p>Total reviews: <strong id="total-reviews"></strong></p>
+    <p>Average rating: <strong id="avg-rating"></strong></p>
+    <label for="desired-rating">Desired average (1–5):</label>
+    <input id="desired-rating" type="number" min="1" max="5" step="0.1" value="4.5">
+    <button id="calc-needed">Calculate 5★ Needed</button>
+    <p id="needed-output"></p>
+  </div>
+
+  <div id="reviews-list"></div>
+
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places"
+    async defer>
+  </script>
+  <script>
+    let autocomplete, service;
+    function initMap() {
+      const input = document.getElementById('place-search');
+      autocomplete = new google.maps.places.Autocomplete(input, { types: ['establishment'] });
+      service = new google.maps.places.PlacesService(document.createElement('div'));
+    }
+
+    function renderSummary(data) {
+      document.getElementById('total-reviews').textContent = data.total;
+      document.getElementById('avg-rating').textContent = data.rating.toFixed(2);
+      document.getElementById('summary').hidden = false;
+    }
+
+    function renderReviews(reviews) {
+      const container = document.getElementById('reviews-list');
+      container.innerHTML = '';
+      reviews.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'review-card';
+        card.innerHTML = `
+          <div class="review-header">
+            <span>${r.author_name}</span>
+            <span class="rating">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+          </div>
+          <div>${r.relative_time_description}</div>
+          <p>${r.text || ''}</p>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function fetchAndDisplay(placeId) {
+      service.getDetails({
+        placeId,
+        fields: ['rating','user_ratings_total','reviews']
+      }, (p, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK) {
+          alert('Error fetching details: ' + status);
+          return;
+        }
+        const total = p.user_ratings_total || 0;
+        const rating = p.rating || 0;
+        renderSummary({ total, rating });
+        renderReviews(p.reviews || []);
+      });
+    }
+
+    function calculateNeeded() {
+      const N = +document.getElementById('total-reviews').textContent;
+      const R = +document.getElementById('avg-rating').textContent;
+      const D = +document.getElementById('desired-rating').value;
+      const x = Math.ceil((N * (D - R)) / (5 - D));
+      document.getElementById('needed-output').textContent =
+        x > 0
+          ? `You need ${x} more 5★ reviews to reach ${D.toFixed(1)}★.`
+          : `You’ve already hit ${D.toFixed(1)}★ or above!`;
+    }
+
+    document.getElementById('load-reviews').onclick = () => {
+      const place = autocomplete.getPlace();
+      if (!place || !place.place_id) {
+        alert('Please select a business from the dropdown.');
+        return;
+      }
+      fetchAndDisplay(place.place_id);
+    };
+    document.getElementById('calc-needed').onclick = calculateNeeded;
+
+    window.initMap = initMap;
+  </script>
+</body>
+</html>
