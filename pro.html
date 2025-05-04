@@ -488,13 +488,110 @@
     function generatePrompt() {
       const extraInput = document.getElementById('prompt-input').value.trim();
       const points = extraInput ? extraInput : "the points above";
-      const promptText = `${points} Craft 50 positive detailed reviews based on the above context 
+      const promptText = `${points} 
+
+based on the points above Craft 50 positive detailed reviews based on the above context and strictly follow the requirements outlined below
 Requirements:
-- The sentence structure and phrasing of each review should be unique (different from each other)
-- The main goal is to not sound repetitive
-- Review should follow a storytelling format and sound human like 
-- It should not sound like it is crafted by Artificial Intelligence 
-- Review should sound natural and not promotional
+- Company Name Usage: Do not include the company name in every review. Only insert it into some of the reviews (e.g., Reviews 1, 3, 5, 7, and 10). The rest should use general terms like “the team,” “the service,” “they,” or refer to the experience without naming the company. This prevents repetition and makes the reviews sound more natural.
+
+Sentence Structure Variety: Avoid repeating the same sentence pattern across all reviews. Do not follow a fixed format like:
+“John is the best! The service was amazing. Highly recommended!”
+Instead, vary the tone, style, and flow:
+
+Start some reviews with a personal story
+
+Use different emotional tones (excited, grateful, surprised, relaxed, etc.)
+
+Mix short and long sentences
+
+Vary the structure: some can be casual, others formal or descriptive
+
+Realism and Authenticity: Make it sound like 10 different real people wrote the reviews. Include specific, realistic details, and even small flaws or neutral remarks followed by praise in one or two reviews (e.g., “Had to wait 5 minutes, but it was worth it”), to improve credibility.
+
+Randomize the Review Lengths: Do not make all reviews long, all short, or follow a predictable pattern like alternating between long and short. Instead, randomize the length of each review naturally.
+
+Some reviews should be short and snappy (e.g., 5–10 words: “Fast service. Super satisfied!” or “Will return. Great experience.”)
+
+Others should be medium length (2–4 sentences), and a few should be long and detailed (4–8+ sentences with specific details and storytelling).
+
+Avoid Patterns: The order of lengths should feel random, like:
+Long, short, short, long, medium, short, long, short, long, medium
+This prevents detection when reviews are posted in sequence and makes the overall output more human-like.
+
+Vocabulary Variety – Prioritize Simplicity, Mix in Depth:
+Most reviews should use simple, everyday English—casual tone, easy vocabulary, and natural phrasing that resembles how an average person would write a quick review. Avoid sounding too polished or robotic.
+However, include 1 or 2 reviews that use slightly more advanced vocabulary or articulate phrasing, as if written by a well-spoken or expressive customer. This adds realism and makes the full set of reviews sound more diverse and believable.
+Examples:
+
+Simple: “Fast service, friendly staff. Will come back.”
+
+Slightly refined: “From start to finish, the entire process was smooth, efficient, and exceeded my expectations.”
+
+Avoid Overly Promotional or Dramatic Tone:
+The reviews should sound natural and conversational, like something a real customer would post—not exaggerated or overly enthusiastic. Avoid phrases that sound scripted, fake, or too good to be true (e.g., “Absolutely flawless!”, “10/10 best ever!”, “I’m speechless!”).
+Instead, use subtle praise, realistic appreciation, and moderate expressions. Some reviews can include small imperfections or minor observations (e.g., “Had to wait a bit, but it was worth it”) to sound more believable.
+The goal is to make the reviews feel like genuine customer reflections, not advertising.
+
+Vary Writing Voice Slightly:
+Consider introducing slight differences in writing style—some reviews can be casual and relaxed (“super chill vibe, loved it”), while others are more formal or proper. One or two may include emojis or casual lingo to mimic the variety of people on Google. You can even include 1 broken-English style review if the brand serves a wide customer base.
+
+Randomized Capitalization Styles:
+Vary capitalization across different reviews to reflect real-world typing habits. Some reviews should follow proper sentence case (e.g., “The service was great.”), while others should reflect auto-capitalization being off or inconsistent (e.g., “great experience. will definitely return.”). This variation should be randomly spread out, not patterned. Do not apply improper casing to all or most reviews—only a few should use it inconsistently to mimic natural human typing.
+
+Low-Frequency Emoji Usage:
+Include emojis in only 1 out of every 10 reviews (or fewer). The emoji should be context-appropriate (e.g., 😊, 👍, 🙌), and placed naturally at the end or mid-sentence. Avoid overusing emojis or putting them in every review, as that reduces authenticity. Most real users don’t use emojis in Google reviews—only the occasional expressive person does.
+
+Avoid Non-Standard Punctuation:
+Do not use unusual punctuation marks like colons (:), semicolons (;), dashes (-) or em dashes (—) within reviews. Real reviewers rarely take the time to format their writing this precisely. Stick to simple, natural punctuation: periods (.), commas (,), exclamation points (!) used sparingly, and question marks (?) only when contextually necessary.
+
+Include Casual Time References in Some Reviews:
+In 3 reviews, include a soft time reference like “visited last week,” “came here yesterday,” “this morning was my first time,” or “been here twice this month.” This adds a sense of real-time behavior and improves believability.
+
+Vary Reviewer Contexts Subtly:
+In a few reviews, mention small contextual clues that hint at different demographics or scenarios (e.g., “great spot for a quick lunch break,” “brought my kids and they loved it,” “perfect after a long day at work”). This helps make the pool of reviews feel like they came from diverse customers.
+
+Use Specific, Natural Details Without Copying Full Names:
+When known, include realistic and specific references to services, products, staff, or actions (e.g., “the sambal chicken was crispy,” “Jane at the front desk was super helpful,” “checkout was quick and smooth”). These details add realism and depth to the review.
+However, do not quote full item names exactly as listed in menus, brochures, or catalogs. Simplify them into natural, conversational descriptions, as a real customer would say casually.
+For example:
+
+❌ “Three Piece Fried Chicken with Sambal Chilli and Coke with Mayo Sauce – Best Seller”
+✅ “Tried the sambal chicken combo it is delicious.”
+
+❌ “Premium Platinum Lock Installation with NFC Key System”
+✅ “They installed an NFC lock for me super smooth process.”
+
+Avoid Repeating the Same Business or Item Names Across Consecutive Reviews:
+Do not repeat the exact business name, product name, food name, or service name in multiple reviews back-to-back. Spread them out randomly across the full set of reviews.
+
+Only include the business name in a few randomly selected reviews, not in all. The rest should refer to the business with general terms like “this place,” “the team,” “the restaurant,” or skip naming entirely.
+
+Similarly, if referencing food or product names (e.g., “salted egg pork rib”, “crispy chicken mid wings”), do not repeat the same item across reviews unless it makes natural sense (e.g., being a top-seller). Even then, ensure the phrasing is varied and mention is spaced out—not clustered together.
+
+✔️ Examples:
+
+“Had dinner at Golden Spoon Seafood last night…”
+
+“This spot serves the crispiest cereal prawns.”
+
+“We tried the pork rib dish—real comfort food.”
+
+“Kids loved the fried stuff, portions were generous.”
+
+This spacing makes the reviews feel like they were written by different people on different days, and prevents artificial repetition.
+
+trict Limit on Business Name Mentions (Per 5 Reviews):
+To maintain realism and avoid obvious patterns, only mention the business or brand name once for every 5 reviews. The rest should use general references like “this place,” “the restaurant,” “the team,” or no name at all.
+Within each 5-review block, randomize which review contains the business name—do not always use it in the 1st or 5th review.
+This means:
+
+Reviews 1–5 → only one should contain the brand name (randomly selected)
+
+Reviews 6–10 → again, only one
+
+Reviews 11–15 → same rule applies and so on for the rest of the reviews
+
+This rule applies regardless of total review count, ensuring name usage is well-distributed and never repetitive.
 
 Formatting the reviews, do not number the reviews. Separate each review with a new line. 
 
