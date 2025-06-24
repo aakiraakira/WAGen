@@ -30,6 +30,16 @@
         .pac-item:hover { background-color: #374151; }
         .pac-item-query { font-weight: 500; color: #f9fafb; }
         .hidden { display: none; }
+        
+        /* Style for the sticky admin tabs */
+        .sticky-tabs {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #111827; /* Match body background */
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body class="text-gray-200">
@@ -200,13 +210,13 @@
                         </div>
                         
                         <div id="client-reviews-section" class="mt-8 ${!isLinkSet ? 'hidden' : ''}">
-                            <div class="flex justify-between items-center mb-6">
-                                <h2 class="text-xl font-semibold text-white">Step 2: Add Your Reviews (${reviews.length})</h2>
-                                <button id="add-client-review-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Add New Review</button>
+                            <div class="mb-6">
+                                <h2 class="text-xl font-semibold text-white mb-4">Step 2: Add Your Reviews (${reviews.length})</h2>
+                                <button id="add-client-review-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Add New Review</button>
                             </div>
                             <div id="client-reviews-container">${this.renderClientReviews()}</div>
-                             <div class="mt-8 pt-6 border-t border-gray-700 text-right">
-                                 <button id="download-client-file-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button>
+                             <div class="mt-8 pt-6 border-t border-gray-700">
+                                 <button id="download-client-file-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button>
                              </div>
                         </div>
                     `;
@@ -228,19 +238,27 @@
                                     <textarea data-index="${index}" class="content-input w-full p-3 bg-gray-900 border border-gray-600 rounded-lg h-40 resize-none">${review.text}</textarea>
                                 </div>
                                 <div>
-                                    <label class="font-semibold text-gray-300 mb-2 block">Images</label>
-                                    <div class="image-previews-container grid grid-cols-3 gap-2 mb-2">
-                                        ${(review.imageDataUrls || []).map((url, imgIndex) => `
-                                            <div class="relative group">
-                                                <img src="${url}" class="w-full h-24 object-cover rounded-lg">
-                                                <button data-review-index="${index}" data-image-index="${imgIndex}" class="remove-image-btn absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
-                                            </div>
-                                        `).join('')}
+                                    <div class="mb-2">
+                                        <label class="font-semibold text-gray-300 cursor-pointer">
+                                            <input type="checkbox" data-index="${index}" class="image-required-toggle mr-2 accent-blue-500" ${review.requiresImage ? 'checked' : ''}>
+                                            This review requires image(s)
+                                        </label>
                                     </div>
-                                    <label class="file-input-button w-full h-12 bg-gray-900 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center text-sm text-gray-500 hover:bg-gray-700 hover:text-white">
-                                        Click to upload images
-                                        <input type="file" data-index="${index}" class="image-input hidden" accept="image/*" multiple>
-                                    </label>
+                                    <div class="image-upload-section ${review.requiresImage ? '' : 'hidden'}">
+                                        <label class="font-semibold text-gray-300 mb-2 block">Images</label>
+                                        <div class="image-previews-container grid grid-cols-3 gap-2 mb-2">
+                                            ${(review.imageDataUrls || []).map((url, imgIndex) => `
+                                                <div class="relative group">
+                                                    <img src="${url}" class="w-full h-24 object-cover rounded-lg">
+                                                    <button data-review-index="${index}" data-image-index="${imgIndex}" class="remove-image-btn absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <label class="file-input-button w-full h-12 bg-gray-900 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center text-sm text-gray-500 hover:bg-gray-700 hover:text-white">
+                                            Click to upload images
+                                            <input type="file" data-index="${index}" class="image-input hidden" accept="image/*" multiple>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -276,7 +294,7 @@
                     const company = companies.find(c => c.id === this.state.activeCompanyId);
 
                     return `
-                        <div class="border-b border-gray-600 mb-6">
+                        <div class="sticky-tabs border-b border-gray-600 mb-6">
                             <nav class="-mb-px flex gap-4 overflow-x-auto" aria-label="Tabs">
                                 ${companies.map(c => `
                                     <button data-id="${c.id}" class="company-tab-btn group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${this.state.activeCompanyId === c.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}">
@@ -302,19 +320,14 @@
                                   <h2 class="text-2xl font-bold text-white">${company.name}</h2>
                                   <a href="${company.reviewLink || '#'}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all">${company.reviewLink || 'No review link set yet.'}</a>
                                 </div>
-                                <div class="flex flex-col gap-3 items-end w-full md:w-auto">
-                                    <div class="flex items-center flex-wrap gap-3 justify-end">
-                                        <button data-id="${company.id}" class="copy-latest-undone-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg" ${undoneReviews.length === 0 ? 'disabled' : ''}>Copy Latest</button>
-                                        <label class="file-input-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                                            Upload File
-                                            <input type="file" data-id="${company.id}" class="upload-admin-file hidden" accept=".json">
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center flex-wrap gap-3 justify-end">
-                                        <button data-id="${company.id}" class="download-admin-file-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Download Data</button>
-                                        <button data-id="${company.id}" class="clear-done-btn bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg" ${doneReviews === 0 ? 'disabled': ''}>Clear Done</button>
-                                        <button data-id="${company.id}" class="remove-company-btn bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Delete Company</button>
-                                    </div>
+                                <div class="grid grid-cols-2 gap-3 w-full md:w-auto">
+                                    <button data-id="${company.id}" class="copy-latest-undone-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg" ${undoneReviews.length === 0 ? 'disabled' : ''}>Copy Latest</button>
+                                    <label class="file-input-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-center">
+                                        Upload File
+                                        <input type="file" data-id="${company.id}" class="upload-admin-file hidden" accept=".json">
+                                    </label>
+                                    <button data-id="${company.id}" class="download-admin-file-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Download</button>
+                                    <button data-id="${company.id}" class="remove-company-btn bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Delete</button>
                                 </div>
                             </div>
                             <!-- Progress Bar -->
@@ -336,18 +349,19 @@
 
                 getAdminReviewHtml(company, review, index) {
                     const isDone = review.status === 'done';
+                    const hasImages = review.requiresImage && review.imageDataUrls && review.imageDataUrls.length > 0;
                     return `
                         <div class="review-item relative bg-gray-800 p-6 rounded-xl mb-6 shadow-lg border ${isDone ? 'border-green-500 opacity-60' : 'border-gray-700'}">
                             ${isDone ? '<span class="absolute top-3 right-3 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full">DONE</span>' : ''}
                             <div class="flex justify-between items-start mb-4">
                                 <span class="text-2xl font-bold text-indigo-400">#${index + 1}</span>
                             </div>
-                            <div class="grid grid-cols-1 ${review.imageDataUrls && review.imageDataUrls.length > 0 ? 'md:grid-cols-2' : ''} gap-6">
+                            <div class="grid grid-cols-1 ${hasImages ? 'md:grid-cols-2' : ''} gap-6">
                                 <div class="space-y-2">
                                     <p class="font-semibold text-gray-300">Review Content:</p>
                                     <p class="p-3 bg-gray-900 border border-gray-600 rounded-lg whitespace-pre-wrap">${review.text}</p>
                                 </div>
-                                ${review.imageDataUrls && review.imageDataUrls.length > 0 ? `
+                                ${hasImages ? `
                                 <div>
                                     <p class="font-semibold text-gray-300 mb-2">Submitted Images:</p>
                                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -362,7 +376,7 @@
                                     ? `<button data-index="${index}" class="undo-review-btn flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Undo</button>`
                                     : `<button data-index="${index}" class="copy-btn flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Copy for Telegram</button>`
                                 }
-                                ${review.imageDataUrls && review.imageDataUrls.length > 0 ? `<button data-index="${index}" class="save-image-btn flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Save All Images</button>` : ''}
+                                ${hasImages ? `<button data-index="${index}" class="save-image-btn flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Save All Images</button>` : ''}
                             </div>
                         </div>`;
                 },
@@ -385,10 +399,10 @@
                     const target = e.target;
                     
                     if (target.id === 'how-to-use-btn') {
-                        this.showInfoModal( 'How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Find Business:</strong> Use the search bar to find the business. Select it from the dropdown. Or, paste the full Google Review link and click "Set Manually".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Click the "upload images" area to select one or more pictures for that review.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator via WhatsApp.</li></ol>`);
+                        this.showInfoModal( 'How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Find Business:</strong> Use the search bar to find the business. Or, paste the Google Review link and click "Set Manually".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Check the "This review requires image(s)" box to show the uploader. Click it to select one or more pictures.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator via WhatsApp.</li></ol>`);
                     }
                     if (target.id === 'add-client-review-btn') {
-                        this.state.clientState.reviews.unshift({ text: '', imageDataUrls: [] });
+                        this.state.clientState.reviews.unshift({ text: '', requiresImage: false, imageDataUrls: [] });
                         this.render();
                     }
                     if (target.closest('.remove-client-review-btn')) {
@@ -419,9 +433,18 @@
                 },
                 handleClientInput(e) { if(e.target.classList.contains('content-input')) { this.state.clientState.reviews[e.target.dataset.index].text = e.target.value; } },
                 async handleClientChange(e) {
-                    if(e.target.classList.contains('image-input')) {
-                        const index = e.target.dataset.index;
-                        const files = e.target.files;
+                    const target = e.target;
+                    const index = target.dataset.index;
+
+                    if(target.classList.contains('image-required-toggle')) {
+                        this.state.clientState.reviews[index].requiresImage = target.checked;
+                        if (!target.checked) {
+                            this.state.clientState.reviews[index].imageDataUrls = []; // Clear images if unchecked
+                        }
+                        this.render();
+                    }
+                    if(target.classList.contains('image-input')) {
+                        const files = target.files;
                         if (files.length > 0) {
                             this.showNotification(`Compressing ${files.length} image(s)...`, 'info');
                             for (const file of files) {
@@ -466,23 +489,33 @@
                             this.saveData(); this.render();
                         });
                     }
-                    if(target.closest('.clear-done-btn')) {
-                        const id = target.closest('.clear-done-btn').dataset.id;
-                        this.showConfirmModal('Clear Done Reviews?', 'This will remove all reviews marked as DONE for this company.', () => {
-                            const company = this.state.data.companies.find(c => c.id === id);
-                            if (company) {
-                                company.reviews = company.reviews.filter(r => r.status !== 'done');
-                                this.saveData(); this.render();
-                            }
-                        });
-                    }
-
+                    
                     const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
                     if(!company) return;
 
                     const reviewIndex = e.target.closest('[data-review-index]')?.dataset.reviewIndex ?? e.target.closest('[data-index]')?.dataset.index;
-                    if (!reviewIndex && !target.closest('.copy-latest-undone-btn, .download-admin-file-btn')) return;
+                    
+                    if (target.closest('.copy-latest-undone-btn')) {
+                        const latestUndone = company.reviews.map((r, i) => ({...r, originalIndex: i})).reverse().find(r => r.status !== 'done');
+                        if (latestUndone) {
+                            const textToCopy = `Click: ${company.reviewLink}\n\n\`${latestUndone.text}\``;
+                            this.copyToClipboard(textToCopy);
+                            company.reviews[latestUndone.originalIndex].status = 'done';
+                            this.saveData(); this.render();
+                        } else { this.showNotification('No new reviews to copy.'); }
+                        return;
+                    }
+                     if (target.closest('.download-admin-file-btn')) {
+                        const companyToDownload = this.state.data.companies.find(c => c.id === target.dataset.id);
+                        const dataBlob = new Blob([JSON.stringify(companyToDownload, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(dataBlob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = `data_${companyToDownload.name.replace(/\s+/g, '_')}.json`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                        return;
+                    }
 
+                    if (!reviewIndex) return;
                     const review = company.reviews[reviewIndex];
 
                     if (target.closest('.copy-btn')) {
@@ -496,15 +529,6 @@
                         this.saveData(); this.render();
                         this.showNotification('Review status reset.');
                     }
-                    if (target.closest('.copy-latest-undone-btn')) {
-                        const latestUndone = company.reviews.map((r, i) => ({...r, originalIndex: i})).reverse().find(r => r.status !== 'done');
-                        if (latestUndone) {
-                            const textToCopy = `Click: ${company.reviewLink}\n\n\`${latestUndone.text}\``;
-                            this.copyToClipboard(textToCopy);
-                            company.reviews[latestUndone.originalIndex].status = 'done';
-                            this.saveData(); this.render();
-                        } else { this.showNotification('No new reviews to copy.'); }
-                    }
                     if (target.closest('.save-image-btn')) {
                          review.imageDataUrls.forEach((url, i) => {
                              const a = document.createElement('a');
@@ -516,14 +540,6 @@
                     if (target.closest('.admin-image-preview')) {
                         const imgIndex = e.target.dataset.imageIndex;
                         this.showImageModal(review.imageDataUrls[imgIndex]);
-                    }
-                    if (target.closest('.download-admin-file-btn')) {
-                        const companyToDownload = this.state.data.companies.find(c => c.id === target.dataset.id);
-                        const dataBlob = new Blob([JSON.stringify(companyToDownload, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(dataBlob);
-                        const a = document.createElement('a');
-                        a.href = url; a.download = `data_${companyToDownload.name.replace(/\s+/g, '_')}.json`;
-                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
                     }
                 },
                 handleAdminChange(e) {
@@ -611,19 +627,19 @@
                     this.elements.loginModalContainer.querySelector('.cancel-login-btn').onclick = () => { this.elements.loginModalContainer.innerHTML = ''; this.switchView('initial'); };
                 },
                 showConfirmModal(title, message, onConfirm) {
-                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]"><div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><p class="text-gray-300 mb-6">${message}</p><div class="flex justify-end gap-4"><button id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button><button id="modal-confirm" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Confirm</button></div></div></div>`;
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000] p-4"><div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><p class="text-gray-300 mb-6">${message}</p><div class="flex justify-end gap-4"><button id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button><button id="modal-confirm" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Confirm</button></div></div></div>`;
                     document.getElementById('modal-cancel').onclick = () => this.elements.genericModalContainer.innerHTML = '';
                     document.getElementById('modal-confirm').onclick = () => { onConfirm(); this.elements.genericModalContainer.innerHTML = ''; };
                 },
                 showPromptModal(title, placeholder, onSubmit) {
-                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]"><form id="prompt-form" class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><input type="text" id="modal-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg mb-6" placeholder="${placeholder}"><div class="flex justify-end gap-4"><button type="button" id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button><button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Submit</button></div></form></div>`;
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000] p-4"><form id="prompt-form" class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><input type="text" id="modal-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg mb-6" placeholder="${placeholder}"><div class="flex justify-end gap-4"><button type="button" id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button><button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Submit</button></div></form></div>`;
                     const input = document.getElementById('modal-input');
                     input.focus();
                     document.getElementById('modal-cancel').onclick = () => this.elements.genericModalContainer.innerHTML = '';
                     document.getElementById('prompt-form').onsubmit = (e) => { e.preventDefault(); onSubmit(input.value); this.elements.genericModalContainer.innerHTML = ''; };
                 },
                 showInfoModal(title, content) {
-                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]"><div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 max-h-[80vh] overflow-y-auto"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><div class="text-gray-300 mb-6 space-y-2">${content}</div><div class="flex justify-end"><button id="modal-close" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div></div></div>`;
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000] p-4"><div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 max-h-[80vh] overflow-y-auto"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><div class="text-gray-300 mb-6 space-y-2">${content}</div><div class="flex justify-end"><button id="modal-close" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div></div></div>`;
                     document.getElementById('modal-close').onclick = () => this.elements.genericModalContainer.innerHTML = '';
                 },
                 showImageModal(src) {
