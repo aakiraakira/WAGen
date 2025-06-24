@@ -8,6 +8,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 
+      The Google Maps API script is loaded asynchronously.
+      The 'places' library is essential for autocomplete and place details.
+      'callback=initMaps' tells the API which function to call once it's fully loaded.
+    -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initMaps"></script>
     <style>
         /* Base styling for the page, using the Inter font */
@@ -45,6 +50,7 @@
 
     <div id="app" class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
+        <!-- Initial View: Portal Selection -->
         <div id="initial-view">
             <header class="text-center mb-12">
                 <h1 class="text-4xl sm:text-5xl font-bold text-white">Review Management Portal</h1>
@@ -66,11 +72,13 @@
             </div>
         </div>
 
+        <!-- Placeholder divs for different application views -->
         <div id="client-view" class="hidden"></div>
         <div id="owner-view" class="hidden"></div>
         <div id="admin-view" class="hidden"></div>
     </div>
     
+    <!-- Containers for modals and notifications -->
     <div id="login-modal-container"></div>
     <div id="generic-modal-container"></div>
     <div id="notification" class="hidden fixed bottom-5 right-5 bg-gray-800 border border-gray-700 text-white py-3 px-5 rounded-lg shadow-xl z-[10001]"></div>
@@ -130,23 +138,42 @@
                     // Listen for the custom event fired by initMaps()
                     document.addEventListener('google-maps-loaded', () => {
                         this.state.mapsInitialized = true;
-                        // Initialize maps if a view requiring them is already active
-                        if (this.state.currentView === 'owner') {
-                            this.initializeOwnerViewMaps();
-                        } else if (this.state.currentView === 'admin') {
-                             this.render(); // Re-render admin to attach maps
-                        }
+                        // The API is loaded, so we can now initialize maps for the current view.
+                        // This handles the race condition if the app loads before the Google script.
+                        this.initializeMapsForCurrentView();
                     });
-                    this.render();
+
+                    // Check if a view was restored from a previous session
+                    const restoredView = localStorage.getItem('currentView');
+                    if (restoredView && restoredView !== 'initial') {
+                        // Attempt to switch to the restored view, which will trigger login if necessary
+                         this.switchView(restoredView, true); // `true` indicates it's a restoration
+                    } else {
+                        this.render();
+                    }
+                },
+                
+                initializeMapsForCurrentView() {
+                    const view = this.state.currentView;
+                     if (!this.state.mapsInitialized) return; // Guard against running before API is ready
+                    
+                    if (view === 'client') this.initializeClientViewMaps();
+                    if (view === 'owner') this.initializeOwnerViewMaps();
+                    if (view === 'admin') this.initializeAdminViewMaps();
                 },
 
                 // --- GOOGLE MAPS & PLACES INTEGRATION ---
+                 initializeClientViewMaps() {
+                    if (!this.state.mapsInitialized || this.state.currentView !== 'client') return;
+                    setTimeout(() => {
+                        this.initAutocomplete('client-link-input', this.handleClientPlaceSelection.bind(this));
+                    }, 100);
+                },
                 initializeOwnerViewMaps() {
                     if (!this.state.mapsInitialized || this.state.currentView !== 'owner') return;
-                    
                     setTimeout(() => {
                         if (this.state.ownerState.activeTab === 'submitter') {
-                            this.initAutocomplete('owner-link-input', this.handlePlaceSelection.bind(this));
+                            this.initAutocomplete('owner-link-input', this.handleOwnerPlaceSelection.bind(this));
                         }
                         if (this.state.ownerState.activeTab === 'tools') {
                             this.initPlaceIdFinderMap();
@@ -202,8 +229,16 @@
                            marker.setPosition(place.geometry.location);
                            marker.setVisible(true);
                         }
-                        this.handlePlaceSelection(place); 
+                        this.handleOwnerPlaceSelection(place); 
                     });
+                },
+                
+                handleClientPlaceSelection(place) {
+                     if (!place || !place.place_id) return;
+                     this.state.clientState.link = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+                     const input = document.getElementById('client-link-input');
+                     if(input) input.value = place.name;
+                     this.render();
                 },
 
                 handleAdminPlaceSelection(place, companyId) {
@@ -218,7 +253,7 @@
                     }
                 },
 
-                handlePlaceSelection(place) {
+                handleOwnerPlaceSelection(place) {
                     if (!place || !place.place_id) {
                         this.showNotification("Could not retrieve company details. Please try again.", "error");
                         return;
@@ -263,21 +298,33 @@
                 },
 
                 // --- VIEW MANAGEMENT ---
-                switchView(view) {
-                    this.state.currentView = view;
+                switchView(view, isRestoring = false) {
+                    // Always show login modal if not logged in, unless it's a session restoration attempt
                     if ((view === 'client' && !this.state.isClientLoggedIn) || (view === 'owner' && !this.state.isOwnerLoggedIn) || (view === 'admin' && !this.state.isAdminLoggedIn)) {
-                        this.showLoginModal(view); 
+                        if (!isRestoring) {
+                             this.showLoginModal(view); 
+                             return;
+                        }
+                        // If restoring a session but not logged in, go back to initial view
+                        this.state.currentView = 'initial';
+                        localStorage.setItem('currentView', 'initial');
+                        this.render();
                         return;
                     }
-                    if (view === 'initial') { this.state.isClientLoggedIn = this.state.isOwnerLoggedIn = this.state.isAdminLoggedIn = false; }
+
+                    this.state.currentView = view;
+                    localStorage.setItem('currentView', view);
+                    
+                    // Reset client/owner state if not restoring a session
+                    if (view === 'client' && !isRestoring) this.state.clientState = { link: '', reviews: [] };
+                    
+                    if (view === 'initial') { 
+                        this.state.isClientLoggedIn = this.state.isOwnerLoggedIn = this.state.isAdminLoggedIn = false; 
+                    }
                     
                     this.render();
-
-                    // Post-render initialization for maps
-                    if(this.state.mapsInitialized) {
-                        if(view === 'owner') this.initializeOwnerViewMaps();
-                        if(view === 'admin') this.initializeAdminViewMaps();
-                    }
+                    
+                    this.initializeMapsForCurrentView();
                 },
                 
                 // --- RENDERING ---
@@ -291,6 +338,10 @@
                     if (this.state.currentView === 'client') this.renderClientView();
                     if (this.state.currentView === 'owner') this.renderOwnerView();
                     if (this.state.currentView === 'admin') this.renderAdminView();
+
+                    // After rendering, ensure maps are initialized for the active view
+                    // This is a failsafe for complex rendering scenarios
+                    this.initializeMapsForCurrentView();
                 },
                 
                 // --- OWNER VIEW RENDERING ---
@@ -313,7 +364,6 @@
                         <div id="owner-prompt-generator-view" class="${activeTab !== 'promptGenerator' ? 'hidden' : ''}">${this.renderOwnerPromptGeneratorView()}</div>
                         <div id="owner-tools-view" class="${activeTab !== 'tools' ? 'hidden' : ''}">${this.renderOwnerToolsView()}</div>
                     `;
-                    if(this.state.mapsInitialized) this.initializeOwnerViewMaps();
                 },
                 
                 renderOwnerSubmitterView() {
@@ -413,11 +463,12 @@
                         </div>
                         <header class="mb-8"><h1 class="text-3xl sm:text-4xl font-bold text-white">Client Review Submission</h1></header>
                         <div id="client-link-section" class="mt-8 p-6 bg-gray-800 border border-gray-700 rounded-xl ${isLinkSet ? 'opacity-70' : ''}">
-                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Paste Google Review Link</h2>
+                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Find Business or Paste Link</h2>
                              <div class="flex flex-col sm:flex-row gap-3">
-                                 <input type="text" id="client-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Paste the business's Google Review link here..." value="${link}" ${isLinkSet ? 'disabled' : ''}>
-                                 <button id="set-client-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg" ${isLinkSet ? 'disabled' : ''}>${isLinkSet ? 'Link Set!' : 'Set Link'}</button>
+                                 <input type="text" id="client-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for a business to get the review link..." ${isLinkSet ? 'disabled' : ''}>
+                                 <button id="set-client-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg whitespace-nowrap" ${isLinkSet ? 'disabled' : ''}>Set Link Manually</button>
                              </div>
+                             ${isLinkSet ? `<p class="text-sm text-green-400 mt-2">Review Link Set: <a href="${link}" target="_blank" class="underline">${link}</a></p>`: ''}
                         </div>
                         <div id="client-reviews-section" class="mt-8 ${!isLinkSet ? 'hidden' : ''}">
                             <div class="mb-6">
@@ -581,7 +632,6 @@
                 handleOwnerTabClick(tab) {
                     this.state.ownerState.activeTab = tab;
                     this.render();
-                    if(this.state.mapsInitialized) this.initializeOwnerViewMaps();
                 },
                 handleGenericClick(e) {
                     const target = e.target;
@@ -591,10 +641,11 @@
 
                     if (this.state.currentView === 'client') {
                         if (target.id === 'add-client-review-btn') { this.state.clientState.reviews.unshift({ text: '', requiresImage: false, imageDataUrls: [] }); this.render(); }
-                        if (target.id === 'how-to-use-btn') { this.showInfoModal('How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Set Link:</strong> Paste the Google Review link and click "Set Link".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Check the "This review requires image(s)" box to show the uploader. Click it to select pictures.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator.</li></ol>`); }
+                        if (target.id === 'how-to-use-btn') { this.showInfoModal('How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Find Business:</strong> Use the search bar to find the business. The review link will be set automatically.</li><li><strong>Set Manually (Optional):</strong> If search doesn't work, paste the full Google Review link and click "Set Link Manually".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Check the "This review requires image(s)" box to show the uploader. Click it to select pictures.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator.</li></ol>`); }
                          if (target.id === 'set-client-link-btn') {
                             const input = document.getElementById('client-link-input');
                             if(this.validateLink(input.value)) { this.state.clientState.link = input.value; this.render(); }
+                            else { this.showNotification('Please enter a valid URL starting with http:// or https://', 'error'); }
                         }
                         if (target.id === 'download-client-file-btn') {
                              this.showPromptModal('Enter a filename', 'e.g., yourname_reviews', (filename) => {
@@ -667,7 +718,6 @@
                         this.state.activeCompanyId = target.closest('.company-tab-btn').dataset.id; 
                         localStorage.setItem('activeCompanyTab', this.state.activeCompanyId);
                         this.render(); 
-                        if(this.state.mapsInitialized) this.initializeAdminViewMaps();
                     }
                     if(target.closest('.remove-company-btn')) {
                         const id = target.closest('.remove-company-btn').dataset.id;
