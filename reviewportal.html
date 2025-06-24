@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Management Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Maps Places API script with your key -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initAutocomplete"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .file-input-button, .view-button { cursor: pointer; }
+        .review-item { transition: all 0.3s ease-in-out; }
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; transform: translateY(20px); }
+            10%, 90% { opacity: 1; transform: translateY(0); }
+        }
+        .notification-toast { animation: fadeInOut 4s ease-in-out forwards; }
+        button:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pac-container { background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.5rem; color: #d1d5db; z-index: 10000 !important; }
+        .pac-item { padding: 0.75rem; cursor: pointer; border-top: 1px solid #374151; }
+        .pac-item:first-child { border-top: none; }
+        .pac-item:hover { background-color: #374151; }
+        .pac-item-query { font-weight: 500; color: #f9fafb; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <div id="app" class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+
+        <!-- Initial View: Choose Portal -->
+        <div id="initial-view">
+            <header class="text-center mb-12">
+                <h1 class="text-4xl sm:text-5xl font-bold text-white">Review Management Portal</h1>
+                <p class="text-gray-400 mt-2">Please select your portal to continue.</p>
+            </header>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div id="client-portal-btn" class="view-button text-center p-8 bg-gray-800 rounded-xl border border-gray-700 hover:border-blue-500 hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-1">
+                    <h2 class="text-3xl font-bold text-blue-400">Client Area</h2>
+                    <p class="mt-2 text-gray-400">Submit new reviews for a business.</p>
+                </div>
+                <div id="admin-portal-btn" class="view-button text-center p-8 bg-gray-800 rounded-xl border border-gray-700 hover:border-indigo-500 hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-1">
+                    <h2 class="text-3xl font-bold text-indigo-400">Admin Dashboard</h2>
+                    <p class="mt-2 text-gray-400">Manage companies and submitted reviews.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client View -->
+        <div id="client-view" class="hidden">
+            <!-- Client view content will be rendered here by JS -->
+        </div>
+
+        <!-- Admin View -->
+        <div id="admin-view" class="hidden">
+             <!-- Admin view content will be rendered here by JS -->
+        </div>
+    </div>
+    
+    <!-- MODALS & NOTIFICATIONS -->
+    <div id="login-modal-container"></div>
+    <div id="generic-modal-container"></div>
+    <div id="notification" class="hidden fixed bottom-5 right-5 bg-gray-800 border border-gray-700 text-white py-3 px-5 rounded-lg shadow-xl z-[10001]"></div>
+    
+    <script>
+        // Global function for Google Maps callback
+        let autocomplete;
+        function initAutocomplete() {
+            const input = document.getElementById('client-link-input');
+            if(!input || input.dataset.acAttached) return; 
+            
+            autocomplete = new google.maps.places.Autocomplete(input, {
+                fields: ["place_id", "name", "url"],
+                types: ["establishment"]
+            });
+            input.dataset.acAttached = 'true';
+
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+                if (place && place.place_id) {
+                    const reviewLink = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+                    document.dispatchEvent(new CustomEvent('placeSelected', { detail: { link: reviewLink } }));
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = {
+                // --- STATE ---
+                state: {
+                    currentView: 'initial',
+                    isClientLoggedIn: false,
+                    isAdminLoggedIn: false,
+                    data: { companies: [] },
+                    activeCompanyId: localStorage.getItem('activeCompanyTab') || null,
+                    clientState: {
+                        link: '',
+                        reviews: []
+                    }
+                },
+
+                // --- DOM ELEMENTS ---
+                elements: {
+                    app: document.getElementById('app'),
+                    initialView: document.getElementById('initial-view'),
+                    clientView: document.getElementById('client-view'),
+                    adminView: document.getElementById('admin-view'),
+                    loginModalContainer: document.getElementById('login-modal-container'),
+                    genericModalContainer: document.getElementById('generic-modal-container'),
+                    notification: document.getElementById('notification'),
+                },
+
+                // --- INITIALIZATION ---
+                init() {
+                    this.loadData();
+                    this.attachInitialListeners();
+                    this.render();
+                },
+
+                // --- DATA PERSISTENCE ---
+                loadData() {
+                    const savedData = localStorage.getItem('reviewDashboardData');
+                    if (savedData) {
+                        this.state.data = JSON.parse(savedData);
+                        if (!this.state.data.companies) this.state.data.companies = [];
+                    }
+                    const activeTab = localStorage.getItem('activeCompanyTab');
+                    if (activeTab && this.state.data.companies.find(c => c.id === activeTab)) {
+                        this.state.activeCompanyId = activeTab;
+                    } else if (this.state.data.companies.length > 0) {
+                        this.state.activeCompanyId = this.state.data.companies[0].id;
+                    }
+                },
+                saveData() {
+                    localStorage.setItem('reviewDashboardData', JSON.stringify(this.state.data));
+                    this.showNotification("Admin data saved!");
+                },
+
+                // --- VIEW MANAGEMENT ---
+                switchView(view) {
+                    this.state.currentView = view;
+                    if (view === 'client' && !this.state.isClientLoggedIn) {
+                        this.showLoginModal('client');
+                        return;
+                    }
+                    if (view === 'admin' && !this.state.isAdminLoggedIn) {
+                        this.showLoginModal('admin');
+                        return;
+                    }
+
+                    if (view === 'client') {
+                        this.state.clientState = { link: '', reviews: [] };
+                    }
+                    
+                    if(view === 'initial') {
+                        this.state.isClientLoggedIn = false;
+                        this.state.isAdminLoggedIn = false;
+                    }
+                    this.render();
+                },
+
+                // --- RENDERING ---
+                render() {
+                    const { initialView, clientView, adminView } = this.elements;
+                    initialView.classList.toggle('hidden', this.state.currentView !== 'initial');
+                    clientView.classList.toggle('hidden', this.state.currentView !== 'client');
+                    adminView.classList.toggle('hidden', this.state.currentView !== 'admin');
+
+                    if (this.state.currentView === 'client') this.renderClientView();
+                    if (this.state.currentView === 'admin') this.renderAdminView();
+                },
+                
+                // --- CLIENT VIEW ---
+                renderClientView() {
+                    const { link, reviews } = this.state.clientState;
+                    const isLinkSet = !!link;
+                    this.elements.clientView.innerHTML = `
+                        <div class="flex justify-between items-center mb-8">
+                            <button class="back-to-initial-btn text-gray-400 hover:text-white">&larr; Logout & Return</button>
+                            <button id="how-to-use-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">? How to Use</button>
+                        </div>
+                        <header class="mb-8">
+                            <h1 class="text-3xl sm:text-4xl font-bold text-white">Client Review Submission</h1>
+                        </header>
+                        <div id="client-link-section" class="mt-8 p-6 bg-gray-800 border border-gray-700 rounded-xl ${isLinkSet ? 'opacity-70' : ''}">
+                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Find Business or Paste Link</h2>
+                             <div class="flex flex-col sm:flex-row gap-3">
+                                 <input type="text" id="client-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for a business or paste link..." value="${link}" ${isLinkSet ? 'disabled' : ''}>
+                                 <button id="set-client-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg" ${isLinkSet ? 'disabled' : ''}>${isLinkSet ? 'Link Set!' : 'Set Manually'}</button>
+                             </div>
+                             <p id="client-link-error" class="text-red-400 mt-2 text-sm hidden">Invalid link.</p>
+                        </div>
+                        
+                        <div id="client-reviews-section" class="mt-8 ${!isLinkSet ? 'hidden' : ''}">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-xl font-semibold text-white">Step 2: Add Your Reviews (${reviews.length})</h2>
+                                <button id="add-client-review-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Add New Review</button>
+                            </div>
+                            <div id="client-reviews-container">${this.renderClientReviews()}</div>
+                             <div class="mt-8 pt-6 border-t border-gray-700 text-right">
+                                 <button id="download-client-file-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button>
+                             </div>
+                        </div>
+                    `;
+                    if(!isLinkSet) setTimeout(() => window.initAutocomplete && initAutocomplete(), 100);
+                },
+                
+                renderClientReviews() {
+                    const { reviews } = this.state.clientState;
+                    if(reviews.length === 0) return '<p class="text-gray-400 text-center py-4">No reviews added yet. Click "Add New Review" to start.</p>';
+                    return reviews.map((review, index) => `
+                        <div class="review-item bg-gray-800 p-6 rounded-xl mb-6 border border-gray-700">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-2xl font-bold text-blue-400">#${index + 1}</span>
+                                <button data-index="${index}" class="remove-client-review-btn text-gray-500 hover:text-red-500 font-bold text-2xl">&times;</button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="font-semibold text-gray-300 mb-2 block">Review Content</label>
+                                    <textarea data-index="${index}" class="content-input w-full p-3 bg-gray-900 border border-gray-600 rounded-lg h-40 resize-none">${review.text}</textarea>
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-gray-300 mb-2 block">Images</label>
+                                    <div class="image-previews-container grid grid-cols-3 gap-2 mb-2">
+                                        ${(review.imageDataUrls || []).map((url, imgIndex) => `
+                                            <div class="relative group">
+                                                <img src="${url}" class="w-full h-24 object-cover rounded-lg">
+                                                <button data-review-index="${index}" data-image-index="${imgIndex}" class="remove-image-btn absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <label class="file-input-button w-full h-12 bg-gray-900 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center text-sm text-gray-500 hover:bg-gray-700 hover:text-white">
+                                        Click to upload images
+                                        <input type="file" data-index="${index}" class="image-input hidden" accept="image/*" multiple>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                },
+                
+                // --- ADMIN VIEW ---
+                renderAdminView() {
+                    this.elements.adminView.innerHTML = `
+                        <div class="flex justify-between items-center mb-8">
+                            <h1 class="text-3xl sm:text-4xl font-bold text-white">Admin Dashboard</h1>
+                            <button class="back-to-initial-btn text-gray-400 hover:text-white">&larr; Logout & Return</button>
+                        </div>
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 self-start">
+                             <h2 class="text-xl font-semibold text-white mb-4">Manage Companies</h2>
+                             <div class="flex flex-col sm:flex-row gap-4">
+                                 <input type="text" id="new-company-name" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" placeholder="New company name...">
+                                 <button id="add-company-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg whitespace-nowrap">Add Company</button>
+                             </div>
+                        </div>
+                        <main id="admin-main-content" class="mt-8">
+                            ${this.renderAdminMainContent()}
+                        </main>
+                    `;
+                },
+                
+                renderAdminMainContent() {
+                    const companies = this.state.data.companies;
+                    if (companies.length === 0) {
+                        return `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><h3 class="text-xl font-semibold text-white">No Companies Added</h3><p class="text-gray-400 mt-2">Please add a company to begin.</p></div>`;
+                    }
+                    
+                    const company = companies.find(c => c.id === this.state.activeCompanyId);
+
+                    return `
+                        <div class="border-b border-gray-600 mb-6">
+                            <nav class="-mb-px flex gap-4 overflow-x-auto" aria-label="Tabs">
+                                ${companies.map(c => `
+                                    <button data-id="${c.id}" class="company-tab-btn group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${this.state.activeCompanyId === c.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}">
+                                        ${c.name}
+                                    </button>
+                                `).join('')}
+                            </nav>
+                        </div>
+                        ${company ? this.renderAdminCompanyDetails(company) : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400 mt-2">Select a company tab to view its details.</p></div>`}
+                    `;
+                },
+                
+                renderAdminCompanyDetails(company) {
+                    const totalReviews = company.reviews?.length || 0;
+                    const doneReviews = company.reviews?.filter(r => r.status === 'done').length || 0;
+                    const progress = totalReviews > 0 ? (doneReviews / totalReviews) * 100 : 0;
+                    const undoneReviews = company.reviews?.filter(r => r.status !== 'done') || [];
+
+                    return `
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8">
+                            <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
+                                <div>
+                                  <h2 class="text-2xl font-bold text-white">${company.name}</h2>
+                                  <a href="${company.reviewLink || '#'}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all">${company.reviewLink || 'No review link set yet.'}</a>
+                                </div>
+                                <div class="flex flex-col gap-3 items-end w-full md:w-auto">
+                                    <div class="flex items-center flex-wrap gap-3 justify-end">
+                                        <button data-id="${company.id}" class="copy-latest-undone-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg" ${undoneReviews.length === 0 ? 'disabled' : ''}>Copy Latest</button>
+                                        <label class="file-input-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                                            Upload File
+                                            <input type="file" data-id="${company.id}" class="upload-admin-file hidden" accept=".json">
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center flex-wrap gap-3 justify-end">
+                                        <button data-id="${company.id}" class="download-admin-file-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Download Data</button>
+                                        <button data-id="${company.id}" class="clear-done-btn bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg" ${doneReviews === 0 ? 'disabled': ''}>Clear Done</button>
+                                        <button data-id="${company.id}" class="remove-company-btn bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Delete Company</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Progress Bar -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-base font-medium text-indigo-400">Completion</span>
+                                    <span class="text-sm font-medium text-indigo-400">${doneReviews} / ${totalReviews} (${Math.round(progress)}%)</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${progress}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="admin-reviews-container">
+                            ${company.reviews && company.reviews.length > 0 ? company.reviews.map((review, index) => this.getAdminReviewHtml(company, review, index)).join('') : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400">No reviews submitted for this company yet. Upload a client file.</p></div>`}
+                        </div>
+                    `;
+                },
+
+                getAdminReviewHtml(company, review, index) {
+                    const isDone = review.status === 'done';
+                    return `
+                        <div class="review-item relative bg-gray-800 p-6 rounded-xl mb-6 shadow-lg border ${isDone ? 'border-green-500 opacity-60' : 'border-gray-700'}">
+                            ${isDone ? '<span class="absolute top-3 right-3 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full">DONE</span>' : ''}
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-2xl font-bold text-indigo-400">#${index + 1}</span>
+                            </div>
+                            <div class="grid grid-cols-1 ${review.imageDataUrls && review.imageDataUrls.length > 0 ? 'md:grid-cols-2' : ''} gap-6">
+                                <div class="space-y-2">
+                                    <p class="font-semibold text-gray-300">Review Content:</p>
+                                    <p class="p-3 bg-gray-900 border border-gray-600 rounded-lg whitespace-pre-wrap">${review.text}</p>
+                                </div>
+                                ${review.imageDataUrls && review.imageDataUrls.length > 0 ? `
+                                <div>
+                                    <p class="font-semibold text-gray-300 mb-2">Submitted Images:</p>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                       ${review.imageDataUrls.map((url, imgIndex) => `
+                                            <img src="${url}" data-review-index="${index}" data-image-index="${imgIndex}" class="admin-image-preview w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity">
+                                       `).join('')}
+                                    </div>
+                                </div>` : ''}
+                            </div>
+                             <div class="mt-6 pt-4 border-t border-gray-700 flex flex-wrap gap-3">
+                                 ${isDone
+                                    ? `<button data-index="${index}" class="undo-review-btn flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Undo</button>`
+                                    : `<button data-index="${index}" class="copy-btn flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Copy for Telegram</button>`
+                                }
+                                ${review.imageDataUrls && review.imageDataUrls.length > 0 ? `<button data-index="${index}" class="save-image-btn flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Save All Images</button>` : ''}
+                            </div>
+                        </div>`;
+                },
+
+                // --- EVENT LISTENERS ---
+                attachInitialListeners() {
+                    document.getElementById('client-portal-btn').addEventListener('click', () => this.switchView('client'));
+                    document.getElementById('admin-portal-btn').addEventListener('click', () => this.switchView('admin'));
+                    this.elements.app.addEventListener('click', e => { if (e.target.closest('.back-to-initial-btn')) { this.switchView('initial'); } });
+                    this.elements.clientView.addEventListener('click', e => this.handleClientClick(e));
+                    this.elements.clientView.addEventListener('input', e => this.handleClientInput(e));
+                    this.elements.clientView.addEventListener('change', e => this.handleClientChange(e));
+                    document.addEventListener('placeSelected', e => this.handlePlaceSelected(e));
+                    this.elements.adminView.addEventListener('click', e => this.handleAdminClick(e));
+                    this.elements.adminView.addEventListener('change', e => this.handleAdminChange(e));
+                },
+
+                // --- EVENT HANDLERS ---
+                handleClientClick(e) {
+                    const target = e.target;
+                    
+                    if (target.id === 'how-to-use-btn') {
+                        this.showInfoModal( 'How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Find Business:</strong> Use the search bar to find the business. Select it from the dropdown. Or, paste the full Google Review link and click "Set Manually".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Click the "upload images" area to select one or more pictures for that review.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator via WhatsApp.</li></ol>`);
+                    }
+                    if (target.id === 'add-client-review-btn') {
+                        this.state.clientState.reviews.unshift({ text: '', imageDataUrls: [] });
+                        this.render();
+                    }
+                    if (target.closest('.remove-client-review-btn')) {
+                        this.state.clientState.reviews.splice(target.closest('.remove-client-review-btn').dataset.index, 1);
+                        this.render();
+                    }
+                    if (target.closest('.remove-image-btn')) {
+                        const reviewIndex = target.dataset.reviewIndex;
+                        const imageIndex = target.dataset.imageIndex;
+                        this.state.clientState.reviews[reviewIndex].imageDataUrls.splice(imageIndex, 1);
+                        this.render();
+                    }
+                    if (target.id === 'download-client-file-btn') {
+                        this.showPromptModal('Enter a filename', 'e.g., yourname_reviews', (filename) => {
+                            if (!filename) { this.showNotification('Download cancelled.', 'error'); return; }
+                            const safeFilename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+                            const dataBlob = new Blob([JSON.stringify(this.state.clientState, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(dataBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${safeFilename}.json`;
+                            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                            this.showNotification('File downloaded! Please send it to us on WhatsApp.');
+                            this.state.clientState = { link: '', reviews: [] };
+                            this.render();
+                        });
+                    }
+                },
+                handleClientInput(e) { if(e.target.classList.contains('content-input')) { this.state.clientState.reviews[e.target.dataset.index].text = e.target.value; } },
+                async handleClientChange(e) {
+                    if(e.target.classList.contains('image-input')) {
+                        const index = e.target.dataset.index;
+                        const files = e.target.files;
+                        if (files.length > 0) {
+                            this.showNotification(`Compressing ${files.length} image(s)...`, 'info');
+                            for (const file of files) {
+                                try {
+                                    const compressedDataUrl = await this.compressImage(file);
+                                    this.state.clientState.reviews[index].imageDataUrls.push(compressedDataUrl);
+                                } catch (err) {
+                                    this.showNotification(`Could not process ${file.name}.`, 'error');
+                                }
+                            }
+                            this.render();
+                            this.showNotification('Images added successfully.');
+                        }
+                    }
+                },
+                handlePlaceSelected(e) { if(this.state.currentView === 'client' && this.validateLink(e.detail.link)) { this.state.clientState.link = e.detail.link; this.render(); } },
+                handleAdminClick(e) {
+                    const target = e.target;
+                    
+                    if(target.id === 'add-company-btn') {
+                        const nameInput = document.getElementById('new-company-name');
+                        if (nameInput.value.trim()) {
+                            const newCompany = { id: `comp_${Date.now()}`, name: nameInput.value.trim(), reviewLink: '', reviews: [] };
+                            this.state.data.companies.push(newCompany);
+                            this.state.activeCompanyId = newCompany.id;
+                            this.saveData(); this.render(); nameInput.value = '';
+                        }
+                    }
+                    if(target.closest('.company-tab-btn')) { 
+                        this.state.activeCompanyId = target.closest('.company-tab-btn').dataset.id; 
+                        localStorage.setItem('activeCompanyTab', this.state.activeCompanyId);
+                        this.render(); 
+                    }
+                    if(target.closest('.remove-company-btn')) {
+                        const id = target.closest('.remove-company-btn').dataset.id;
+                        this.showConfirmModal('Delete Company?', 'Are you sure you want to delete this company and all its data? This cannot be undone.', () => {
+                            this.state.data.companies = this.state.data.companies.filter(c => c.id !== id);
+                            if (this.state.activeCompanyId === id) {
+                                this.state.activeCompanyId = this.state.data.companies[0]?.id || null;
+                                localStorage.setItem('activeCompanyTab', this.state.activeCompanyId);
+                            }
+                            this.saveData(); this.render();
+                        });
+                    }
+                    if(target.closest('.clear-done-btn')) {
+                        const id = target.closest('.clear-done-btn').dataset.id;
+                        this.showConfirmModal('Clear Done Reviews?', 'This will remove all reviews marked as DONE for this company.', () => {
+                            const company = this.state.data.companies.find(c => c.id === id);
+                            if (company) {
+                                company.reviews = company.reviews.filter(r => r.status !== 'done');
+                                this.saveData(); this.render();
+                            }
+                        });
+                    }
+
+                    const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
+                    if(!company) return;
+
+                    const reviewIndex = e.target.closest('[data-review-index]')?.dataset.reviewIndex ?? e.target.closest('[data-index]')?.dataset.index;
+                    if (!reviewIndex && !target.closest('.copy-latest-undone-btn, .download-admin-file-btn')) return;
+
+                    const review = company.reviews[reviewIndex];
+
+                    if (target.closest('.copy-btn')) {
+                        const textToCopy = `Click: ${company.reviewLink}\n\n\`${review.text}\``;
+                        this.copyToClipboard(textToCopy);
+                        review.status = 'done';
+                        this.saveData(); this.render();
+                    }
+                    if (target.closest('.undo-review-btn')) {
+                        review.status = 'undone';
+                        this.saveData(); this.render();
+                        this.showNotification('Review status reset.');
+                    }
+                    if (target.closest('.copy-latest-undone-btn')) {
+                        const latestUndone = company.reviews.map((r, i) => ({...r, originalIndex: i})).reverse().find(r => r.status !== 'done');
+                        if (latestUndone) {
+                            const textToCopy = `Click: ${company.reviewLink}\n\n\`${latestUndone.text}\``;
+                            this.copyToClipboard(textToCopy);
+                            company.reviews[latestUndone.originalIndex].status = 'done';
+                            this.saveData(); this.render();
+                        } else { this.showNotification('No new reviews to copy.'); }
+                    }
+                    if (target.closest('.save-image-btn')) {
+                         review.imageDataUrls.forEach((url, i) => {
+                             const a = document.createElement('a');
+                             a.href = url;
+                             a.download = `review_image_${company.name}_${parseInt(reviewIndex) + 1}_${i + 1}.jpeg`;
+                             document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                         });
+                    }
+                    if (target.closest('.admin-image-preview')) {
+                        const imgIndex = e.target.dataset.imageIndex;
+                        this.showImageModal(review.imageDataUrls[imgIndex]);
+                    }
+                    if (target.closest('.download-admin-file-btn')) {
+                        const companyToDownload = this.state.data.companies.find(c => c.id === target.dataset.id);
+                        const dataBlob = new Blob([JSON.stringify(companyToDownload, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(dataBlob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = `data_${companyToDownload.name.replace(/\s+/g, '_')}.json`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    }
+                },
+                handleAdminChange(e) {
+                    if (e.target.classList.contains('upload-admin-file')) {
+                        const file = e.target.files[0];
+                        const companyId = e.target.dataset.id;
+                        if (file && companyId) {
+                             const reader = new FileReader();
+                             reader.onload = (event) => {
+                                 try {
+                                     const uploaded = JSON.parse(event.target.result);
+                                     if (this.validateLink(uploaded.link) && Array.isArray(uploaded.reviews)) {
+                                         const company = this.state.data.companies.find(c => c.id === companyId);
+                                         if(company) {
+                                             company.reviewLink = uploaded.link;
+                                             const newReviews = uploaded.reviews.map(r => ({...r, status: 'undone'}));
+                                             company.reviews = [...newReviews, ...company.reviews || []];
+                                             this.saveData(); this.render();
+                                             this.showNotification(`${uploaded.reviews.length} review(s) imported for ${company.name}.`);
+                                         }
+                                     } else { this.showNotification('Invalid file format.', 'error'); }
+                                 } catch (err) { this.showNotification('Error reading file.', 'error'); } 
+                                 finally { e.target.value = ''; }
+                             };
+                             reader.readAsText(file);
+                        }
+                    }
+                },
+
+                // --- UTILITIES & MODALS ---
+                compressImage(file, quality = 0.7, maxWidth = 1024) {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(file);
+                        reader.onload = (event) => {
+                            const img = new Image();
+                            img.src = event.target.result;
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const scaleRatio = maxWidth / img.width;
+                                canvas.width = scaleRatio < 1 ? maxWidth : img.width;
+                                canvas.height = scaleRatio < 1 ? img.height * scaleRatio : img.height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                resolve(ctx.canvas.toDataURL('image/jpeg', quality));
+                            };
+                            img.onerror = (error) => reject(error);
+                        };
+                        reader.onerror = (error) => reject(error);
+                    });
+                },
+                showLoginModal(type) {
+                    const isClient = type === 'client';
+                    const title = isClient ? 'Client Login' : 'Admin Login';
+                    const correctUser = isClient ? 'client' : 'admin';
+                    const correctPass = isClient ? 'client' : 'admin';
+                    this.elements.loginModalContainer.innerHTML = `
+                        <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]">
+                            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700">
+                                <h2 class="text-2xl font-bold text-white mb-6">${title}</h2>
+                                <form id="login-form">
+                                    <div class="mb-4"><label for="username" class="block text-gray-300 mb-2">Username</label><input type="text" id="username" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg focus:ring-2 ${isClient ? 'focus:ring-blue-500' : 'focus:ring-indigo-500'}"></div>
+                                    <div class="mb-6"><label for="password" class="block text-gray-300 mb-2">Password</label><input type="password" id="password" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg focus:ring-2 ${isClient ? 'focus:ring-blue-500' : 'focus:ring-indigo-500'}"></div>
+                                    <p id="login-error" class="text-red-400 text-sm mb-4 hidden">Invalid credentials.</p>
+                                    <div class="flex items-center justify-between">
+                                        <button type="button" class="cancel-login-btn text-gray-400 hover:text-white">Cancel</button>
+                                        <button type="submit" class="text-white font-bold py-2 px-6 rounded-lg ${isClient ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'}">Login</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>`;
+                    
+                    const form = this.elements.loginModalContainer.querySelector('#login-form');
+                    form.onsubmit = (e) => {
+                        e.preventDefault();
+                        const user = form.querySelector('#username').value;
+                        const pass = form.querySelector('#password').value;
+                        if (user === correctUser && pass === correctPass) {
+                            if (isClient) this.state.isClientLoggedIn = true;
+                            else this.state.isAdminLoggedIn = true;
+                            this.elements.loginModalContainer.innerHTML = '';
+                            this.switchView(type);
+                        } else { form.querySelector('#login-error').classList.remove('hidden'); }
+                    };
+                    this.elements.loginModalContainer.querySelector('.cancel-login-btn').onclick = () => { this.elements.loginModalContainer.innerHTML = ''; this.switchView('initial'); };
+                },
+                showConfirmModal(title, message, onConfirm) {
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]"><div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><p class="text-gray-300 mb-6">${message}</p><div class="flex justify-end gap-4"><button id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button><button id="modal-confirm" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Confirm</button></div></div></div>`;
+                    document.getElementById('modal-cancel').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                    document.getElementById('modal-confirm').onclick = () => { onConfirm(); this.elements.genericModalContainer.innerHTML = ''; };
+                },
+                showPromptModal(title, placeholder, onSubmit) {
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]"><form id="prompt-form" class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><input type="text" id="modal-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg mb-6" placeholder="${placeholder}"><div class="flex justify-end gap-4"><button type="button" id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button><button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Submit</button></div></form></div>`;
+                    const input = document.getElementById('modal-input');
+                    input.focus();
+                    document.getElementById('modal-cancel').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                    document.getElementById('prompt-form').onsubmit = (e) => { e.preventDefault(); onSubmit(input.value); this.elements.genericModalContainer.innerHTML = ''; };
+                },
+                showInfoModal(title, content) {
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]"><div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 max-h-[80vh] overflow-y-auto"><h2 class="text-2xl font-bold text-white mb-4">${title}</h2><div class="text-gray-300 mb-6 space-y-2">${content}</div><div class="flex justify-end"><button id="modal-close" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div></div></div>`;
+                    document.getElementById('modal-close').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                },
+                showImageModal(src) {
+                     this.elements.genericModalContainer.innerHTML = `<div class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[10000] p-4" id="image-modal-backdrop"><img src="${src}" class="max-w-full max-h-full object-contain"></div>`;
+                     document.getElementById('image-modal-backdrop').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                },
+                validateLink(link) { return link && (link.startsWith('http://') || link.startsWith('https://')); },
+                copyToClipboard(text) {
+                    if (!navigator.clipboard) { this.showNotification("Clipboard not supported.", 'error'); return; }
+                    navigator.clipboard.writeText(text).then(() => { this.showNotification("Copied to clipboard!"); }, () => { this.showNotification("Failed to copy.", 'error'); });
+                },
+                showNotification(message, type = 'success') {
+                    const el = this.elements.notification;
+                    el.textContent = message;
+                    el.className = `notification-toast fixed bottom-5 right-5 text-white py-3 px-5 rounded-lg shadow-xl z-[10001] ${type === 'info' ? 'bg-blue-600' : type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+                    setTimeout(() => el.classList.add('hidden'), 4000);
+                }
+            };
+
+            app.init();
+        });
+    </script>
+</body>
+</html>
