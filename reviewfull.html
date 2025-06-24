@@ -92,7 +92,7 @@
 
         function initAutocomplete() {
             const input = document.getElementById('client-link-input');
-            if(!input) return; // Prevent errors if input doesn't exist yet
+            if(!input) return;
             autocomplete = new google.maps.places.Autocomplete(input, {
                 fields: ["place_id", "name"],
                 types: ["establishment"]
@@ -110,14 +110,17 @@
             const app = {
                 // --- STATE ---
                 state: {
-                    currentView: 'initial', // 'initial', 'client', 'admin'
+                    currentView: 'initial',
                     data: { companies: [] },
                     activeCompanyId: null,
+                    clientState: {
+                        link: '',
+                        reviews: []
+                    }
                 },
 
                 // --- DOM ELEMENTS ---
                 elements: {
-                    app: document.getElementById('app'),
                     initialView: document.getElementById('initial-view'),
                     clientView: document.getElementById('client-view'),
                     adminView: document.getElementById('admin-view'),
@@ -137,16 +140,21 @@
                     const savedData = localStorage.getItem('reviewDashboardData');
                     if (savedData) {
                         this.state.data = JSON.parse(savedData);
+                        if (!this.state.data.companies) this.state.data.companies = [];
                     }
                 },
                 saveData() {
                     localStorage.setItem('reviewDashboardData', JSON.stringify(this.state.data));
-                    this.showNotification("Data saved!");
+                    this.showNotification("Admin data saved!");
                 },
 
                 // --- VIEW MANAGEMENT ---
                 switchView(view) {
                     this.state.currentView = view;
+                    if (view === 'client') {
+                        // Reset client state when entering
+                        this.state.clientState = { link: '', reviews: [] };
+                    }
                     this.render();
                 },
 
@@ -160,8 +168,10 @@
                     if (this.state.currentView === 'client') this.renderClientView();
                     if (this.state.currentView === 'admin') this.renderAdminView();
                 },
-
-                renderClientView(link = '', reviews = []) {
+                
+                // --- CLIENT VIEW ---
+                renderClientView() {
+                    const { link, reviews } = this.state.clientState;
                     const isLinkSet = !!link;
                     this.elements.clientView.innerHTML = `
                         <button class="back-to-initial-btn text-gray-400 hover:text-white mb-8">&larr; Back to Portal Selection</button>
@@ -180,25 +190,24 @@
                         <div id="client-reviews-section" class="mt-8 ${!isLinkSet ? 'hidden' : ''}">
                              <h2 class="text-xl font-semibold text-white mb-4">Step 2: Add Your Reviews</h2>
                             <button id="add-client-review-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg mb-6">Add New Review</button>
-                            <div id="client-reviews-container"></div>
+                            <div id="client-reviews-container">${this.renderClientReviews()}</div>
                              <div class="mt-8 pt-6 border-t border-gray-700 text-right">
                                 <button id="download-client-file-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button>
                              </div>
                         </div>
                     `;
-                    this.attachClientListeners(link, reviews);
-                    this.renderClientReviews(reviews);
+                    this.attachClientListeners();
                     if(!isLinkSet) setTimeout(() => initAutocomplete(), 0);
                 },
                 
-                renderClientReviews(reviews) {
-                    const container = document.getElementById('client-reviews-container');
-                    if(!container) return;
-                    container.innerHTML = reviews.map((review, index) => `
+                renderClientReviews() {
+                    const { reviews } = this.state.clientState;
+                    if(reviews.length === 0) return '';
+                    return reviews.map((review, index) => `
                         <div class="review-item bg-gray-800 p-6 rounded-xl mb-6 border border-gray-700">
                             <div class="flex justify-between items-start mb-4">
                                 <span class="text-2xl font-bold text-blue-400">#${index + 1}</span>
-                                <button data-index="${index}" class="remove-client-review-btn text-gray-500 hover:text-red-500">&times;</button>
+                                <button data-index="${index}" class="remove-client-review-btn text-gray-500 hover:text-red-500 font-bold text-2xl">&times;</button>
                             </div>
                              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
@@ -222,62 +231,75 @@
                         </div>
                     `).join('');
                 },
-
+                
+                // --- ADMIN VIEW ---
                 renderAdminView() {
                     this.elements.adminView.innerHTML = `
                         <div class="flex justify-between items-center mb-8">
                             <h1 class="text-3xl sm:text-4xl font-bold text-white">Admin Dashboard</h1>
                             <button class="back-to-initial-btn text-gray-400 hover:text-white">&larr; Back to Portal Selection</button>
                         </div>
-                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                            <aside class="lg:col-span-1 bg-gray-800 p-6 rounded-xl border border-gray-700 self-start">
-                                <h2 class="text-xl font-semibold text-white mb-4">Companies</h2>
-                                <div class="mb-4">
-                                    <input type="text" id="new-company-name" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" placeholder="New company name...">
-                                    <button id="add-company-btn" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Add Company</button>
-                                </div>
-                                <ul id="company-list" class="space-y-2">
-                                    ${this.state.data.companies.map(c => `
-                                        <li class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${this.state.activeCompanyId === c.id ? 'bg-indigo-500 text-white' : 'hover:bg-gray-700'}" data-id="${c.id}">
-                                            <span class="company-select-btn flex-1">${c.name}</span>
-                                            <button data-id="${c.id}" class="remove-company-btn text-gray-400 hover:text-red-500 ml-2 p-1">&times;</button>
-                                        </li>
-                                    `).join('')}
-                                </ul>
-                            </aside>
-                            <main id="admin-main-content" class="lg:col-span-3">
-                                ${this.renderAdminMainContent()}
-                            </main>
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 self-start">
+                             <h2 class="text-xl font-semibold text-white mb-4">Manage Companies</h2>
+                             <div class="flex flex-col sm:flex-row gap-4">
+                                <input type="text" id="new-company-name" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" placeholder="New company name...">
+                                <button id="add-company-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg whitespace-nowrap">Add Company</button>
+                            </div>
                         </div>
+                        <main id="admin-main-content" class="mt-8">
+                            ${this.renderAdminMainContent()}
+                        </main>
                     `;
                     this.attachAdminListeners();
                 },
                 
                 renderAdminMainContent() {
-                    const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
-                    if (!company) {
-                        return `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><h3 class="text-xl font-semibold text-white">No Company Selected</h3><p class="text-gray-400 mt-2">Please add or select a company from the list.</p></div>`;
+                    const companies = this.state.data.companies;
+                    if (companies.length === 0) {
+                        return `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><h3 class="text-xl font-semibold text-white">No Companies Added</h3><p class="text-gray-400 mt-2">Please add a company to begin.</p></div>`;
                     }
+                    
+                    const company = companies.find(c => c.id === this.state.activeCompanyId);
+
                     return `
-                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8">
-                            <div class="flex flex-wrap justify-between items-center gap-4">
-                               <div>
-                                 <h2 class="text-2xl font-bold text-white">${company.name}</h2>
-                                 <a href="${company.reviewLink}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all">${company.reviewLink}</a>
-                               </div>
-                                <label class="file-input-button bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
-                                    Upload Client File
-                                    <input type="file" id="upload-admin-file" class="hidden" accept=".json">
-                                </label>
-                            </div>
+                        <div class="border-b border-gray-600 mb-6">
+                            <nav class="-mb-px flex gap-4" aria-label="Tabs">
+                                ${companies.map(c => `
+                                    <button data-id="${c.id}" class="company-tab-btn group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${this.state.activeCompanyId === c.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}">
+                                        ${c.name}
+                                    </button>
+                                `).join('')}
+                            </nav>
                         </div>
-                        <div id="admin-reviews-container">
-                            ${company.reviews.length > 0 ? company.reviews.map((review, index) => this.getAdminReviewHtml(review, index)).join('') : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400">No reviews submitted for this company yet.</p></div>`}
-                        </div>
+                        ${company ? this.renderAdminCompanyDetails(company) : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400 mt-2">Select a company tab to view its details.</p></div>`}
                     `;
                 },
                 
-                getAdminReviewHtml(review, index) {
+                renderAdminCompanyDetails(company) {
+                    return `
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8">
+                            <div class="flex flex-wrap justify-between items-start gap-4">
+                               <div>
+                                 <h2 class="text-2xl font-bold text-white">${company.name}</h2>
+                                 <a href="${company.reviewLink || '#'}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all">${company.reviewLink || 'No review link set yet.'}</a>
+                               </div>
+                               <div class="flex items-center gap-3 flex-shrink-0">
+                                    <label class="file-input-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                                        Upload File
+                                        <input type="file" data-id="${company.id}" class="upload-admin-file hidden" accept=".json">
+                                    </label>
+                                    <button data-id="${company.id}" class="download-admin-file-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Download Data</button>
+                                    <button data-id="${company.id}" class="remove-company-btn text-red-500 hover:text-red-400 font-bold p-2">&times; Delete Company</button>
+                               </div>
+                            </div>
+                        </div>
+                        <div id="admin-reviews-container">
+                            ${company.reviews && company.reviews.length > 0 ? company.reviews.map((review, index) => this.getAdminReviewHtml(company, review, index)).join('') : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400">No reviews submitted for this company yet. Upload a client file.</p></div>`}
+                        </div>
+                    `;
+                },
+
+                getAdminReviewHtml(company, review, index) {
                     const isDone = review.status === 'done';
                     return `
                         <div class="review-item relative bg-gray-800 p-6 rounded-xl mb-6 shadow-lg border ${isDone ? 'border-green-500 opacity-70' : 'border-gray-700'}">
@@ -296,15 +318,13 @@
                                     <div class="w-full h-48 bg-gray-900 rounded-lg flex items-center justify-center">
                                        ${review.imageDataUrl ? `<img src="${review.imageDataUrl}" class="w-full h-full object-contain rounded-lg">` : `<span class="text-gray-500">No image submitted.</span>`}
                                     </div>
-                                </div>
-                                ` : ''}
+                                </div>` : ''}
                             </div>
                              <div class="mt-4 pt-4 border-t border-gray-700 flex flex-wrap gap-3">
                                 <button data-index="${index}" class="copy-btn flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg" ${isDone ? 'disabled' : ''}>Copy for Telegram</button>
-                                ${review.requiresImage ? `<button data-index="${index}" class="save-image-btn flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg" ${!review.imageDataUrl ? 'disabled' : ''}>Save Image</button>` : ''}
+                                ${review.requiresImage && review.imageDataUrl ? `<button data-index="${index}" class="save-image-btn flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Save Image</button>` : ''}
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 },
 
                 // --- EVENT LISTENERS ---
@@ -313,9 +333,7 @@
                     document.getElementById('admin-portal-btn').addEventListener('click', () => this.elements.loginModal.classList.remove('hidden'));
                     document.getElementById('login-form').addEventListener('submit', (e) => {
                         e.preventDefault();
-                        const user = document.getElementById('username').value;
-                        const pass = document.getElementById('password').value;
-                        if (user === 'admin' && pass === 'admin') {
+                        if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'admin') {
                             this.elements.loginModal.classList.add('hidden');
                             this.switchView('admin');
                         } else {
@@ -325,39 +343,31 @@
                     document.getElementById('cancel-login-btn').addEventListener('click', () => this.elements.loginModal.classList.add('hidden'));
                 },
                 
-                attachClientListeners(currentLink, currentReviews) {
-                    const backBtn = this.elements.clientView.querySelector('.back-to-initial-btn');
-                    if(backBtn) backBtn.addEventListener('click', () => this.switchView('initial'));
-
-                    const setLinkBtn = document.getElementById('set-client-link-btn');
-                    if(setLinkBtn) setLinkBtn.addEventListener('click', () => {
-                        const linkInput = document.getElementById('client-link-input');
-                        if (this.validateLink(linkInput.value)) {
-                            this.renderClientView(linkInput.value, []);
-                        } else {
-                           document.getElementById('client-link-error').classList.remove('hidden');
+                attachClientListeners() {
+                    const view = this.elements.clientView;
+                    view.addEventListener('click', (e) => {
+                        const target = e.target;
+                        if(target.closest('.back-to-initial-btn')) this.switchView('initial');
+                        
+                        if(target.id === 'set-client-link-btn') {
+                            const linkInput = document.getElementById('client-link-input');
+                            if (this.validateLink(linkInput.value)) {
+                                this.state.clientState.link = linkInput.value;
+                                this.render();
+                            } else {
+                               document.getElementById('client-link-error').classList.remove('hidden');
+                            }
                         }
-                    });
-                    
-                    document.addEventListener('placeSelected', (e) => {
-                        if(this.state.currentView !== 'client') return;
-                        if (this.validateLink(e.detail.link)) {
-                            this.renderClientView(e.detail.link, []);
+                        if (target.id === 'add-client-review-btn') {
+                            this.state.clientState.reviews.unshift({ text: '', requiresImage: false, imageDataUrl: null });
+                            this.render();
                         }
-                    }, { once: true }); // Important to avoid multiple listeners
-
-                    const reviewsContainer = document.getElementById('client-reviews-container');
-                    this.elements.clientView.addEventListener('click', (e) => {
-                        if (e.target.id === 'add-client-review-btn') {
-                            currentReviews.unshift({ text: '', requiresImage: false, imageDataUrl: null });
-                            this.renderClientView(currentLink, currentReviews);
+                        if (target.closest('.remove-client-review-btn')) {
+                            this.state.clientState.reviews.splice(target.closest('.remove-client-review-btn').dataset.index, 1);
+                            this.render();
                         }
-                        if (e.target.closest('.remove-client-review-btn')) {
-                            currentReviews.splice(e.target.closest('.remove-client-review-btn').dataset.index, 1);
-                            this.renderClientView(currentLink, currentReviews);
-                        }
-                        if (e.target.id === 'download-client-file-btn') {
-                            const dataBlob = new Blob([JSON.stringify({ reviewLink: currentLink, reviews: currentReviews }, null, 2)], { type: 'application/json' });
+                        if (target.id === 'download-client-file-btn') {
+                            const dataBlob = new Blob([JSON.stringify(this.state.clientState, null, 2)], { type: 'application/json' });
                             const url = URL.createObjectURL(dataBlob);
                             const a = document.createElement('a');
                             a.href = url;
@@ -366,26 +376,33 @@
                             URL.revokeObjectURL(url);
                         }
                     });
+                    
+                    document.addEventListener('placeSelected', (e) => {
+                         if(this.state.currentView === 'client' && this.validateLink(e.detail.link)) {
+                            this.state.clientState.link = e.detail.link;
+                            this.render();
+                         }
+                    });
 
-                    this.elements.clientView.addEventListener('input', (e) => {
+                    view.addEventListener('input', (e) => {
                         if(e.target.classList.contains('content-input')) {
-                            currentReviews[e.target.dataset.index].text = e.target.value;
+                            this.state.clientState.reviews[e.target.dataset.index].text = e.target.value;
                         }
                     });
                     
-                     this.elements.clientView.addEventListener('change', (e) => {
+                    view.addEventListener('change', (e) => {
+                        const index = e.target.dataset.index;
                         if(e.target.classList.contains('image-toggle-checkbox')) {
-                             currentReviews[e.target.dataset.index].requiresImage = e.target.checked;
-                             this.renderClientView(currentLink, currentReviews);
+                             this.state.clientState.reviews[index].requiresImage = e.target.checked;
+                             this.render();
                         }
                         if(e.target.classList.contains('image-input')) {
                             const file = e.target.files[0];
-                            const index = e.target.dataset.index;
                             if (file) {
                                 const reader = new FileReader();
                                 reader.onload = (event) => {
-                                    currentReviews[index].imageDataUrl = event.target.result;
-                                    this.renderClientView(currentLink, currentReviews);
+                                    this.state.clientState.reviews[index].imageDataUrl = event.target.result;
+                                    this.render();
                                     this.showNotification('Image loaded.');
                                 };
                                 reader.readAsDataURL(file);
@@ -395,30 +412,35 @@
                 },
                 
                 attachAdminListeners() {
-                    this.elements.adminView.addEventListener('click', (e) => {
+                    const view = this.elements.adminView;
+                    view.addEventListener('click', (e) => {
                         const target = e.target;
-                        if(target.classList.contains('back-to-initial-btn')) this.switchView('initial');
+                        if(target.closest('.back-to-initial-btn')) this.switchView('initial');
+                        
                         if(target.id === 'add-company-btn') {
                             const nameInput = document.getElementById('new-company-name');
                             if (nameInput.value.trim()) {
-                                this.state.data.companies.push({ id: `comp_${Date.now()}`, name: nameInput.value.trim(), reviewLink: '', reviews: [] });
+                                const newCompany = { id: `comp_${Date.now()}`, name: nameInput.value.trim(), reviewLink: '', reviews: [] };
+                                this.state.data.companies.push(newCompany);
+                                this.state.activeCompanyId = newCompany.id;
                                 this.saveData();
                                 this.render();
                             }
                         }
-                        if(target.closest('.company-select-btn')) {
-                            this.state.activeCompanyId = target.closest('li').dataset.id;
+                        if(target.closest('.company-tab-btn')) {
+                            this.state.activeCompanyId = target.closest('.company-tab-btn').dataset.id;
                             this.render();
                         }
                         if(target.closest('.remove-company-btn')) {
                             const id = target.closest('.remove-company-btn').dataset.id;
-                            if(confirm("Are you sure you want to delete this company and all its data?")) {
+                            if(confirm(`Are you sure you want to delete this company and all its data?`)) {
                                 this.state.data.companies = this.state.data.companies.filter(c => c.id !== id);
                                 if (this.state.activeCompanyId === id) this.state.activeCompanyId = null;
                                 this.saveData();
                                 this.render();
                             }
                         }
+
                         const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
                         if(!company) return;
 
@@ -435,32 +457,45 @@
                              if (review.imageDataUrl) {
                                 const a = document.createElement('a');
                                 a.href = review.imageDataUrl;
-                                a.download = `review_image_${target.dataset.index + 1}.png`;
+                                a.download = `review_image_${company.name}_${parseInt(target.dataset.index) + 1}.png`;
                                 a.click();
                             }
                         }
+                        if (target.classList.contains('download-admin-file-btn')) {
+                            const companyToDownload = this.state.data.companies.find(c => c.id === target.dataset.id);
+                            const dataBlob = new Blob([JSON.stringify(companyToDownload, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(dataBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `data_${companyToDownload.name.replace(/\s+/g, '_')}.json`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        }
                     });
                     
-                    const uploadInput = document.getElementById('upload-admin-file');
-                    if(uploadInput) uploadInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                             const reader = new FileReader();
-                             reader.onload = (event) => {
-                                 try {
-                                     const uploaded = JSON.parse(event.target.result);
-                                     if (this.validateLink(uploaded.reviewLink) && Array.isArray(uploaded.reviews)) {
-                                        const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
-                                        company.reviewLink = uploaded.reviewLink;
-                                        company.reviews = [...company.reviews, ...uploaded.reviews.map(r => ({...r, status: 'pending'}))];
-                                        this.saveData();
-                                        this.render();
-                                        this.showNotification(`Added ${uploaded.reviews.length} reviews to ${company.name}.`);
-                                     } else throw new Error();
-                                 } catch { this.showNotification('Invalid file format.', true); }
-                             };
-                             reader.readAsText(file);
-                             e.target.value = null; // Allow re-upload
+                    view.addEventListener('change', (e) => {
+                        if (e.target.classList.contains('upload-admin-file')) {
+                            const file = e.target.files[0];
+                            const companyId = e.target.dataset.id;
+                            if (file && companyId) {
+                                 const reader = new FileReader();
+                                 reader.onload = (event) => {
+                                     try {
+                                         const uploaded = JSON.parse(event.target.result);
+                                         if (this.validateLink(uploaded.link) && Array.isArray(uploaded.reviews)) {
+                                            const company = this.state.data.companies.find(c => c.id === companyId);
+                                            company.reviewLink = uploaded.link; // The client file now uses 'link'
+                                            const newReviews = uploaded.reviews.map(r => ({...r, status: 'pending'}));
+                                            company.reviews = company.reviews ? [...company.reviews, ...newReviews] : newReviews;
+                                            this.saveData();
+                                            this.render();
+                                            this.showNotification(`Added ${newReviews.length} reviews to ${company.name}.`);
+                                         } else throw new Error('Invalid file content');
+                                     } catch { this.showNotification('Invalid file format or content.', true); }
+                                 };
+                                 reader.readAsText(file);
+                                 e.target.value = null;
+                            }
                         }
                     });
                 },
