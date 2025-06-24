@@ -8,30 +8,41 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Google Maps Places API script -->
+    <!-- 
+      Your Google Maps API Key is included here.
+      The 'places' library is essential for autocomplete and place details.
+      'callback=initMaps' tells the API which function to call once it's loaded.
+    -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initMaps"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        /* Base styling for the page, using the Inter font */
+        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #d1d5db; }
+        /* Custom scrollbar for a better look in dark mode */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        /* Custom styles for buttons and interactive elements */
         .file-input-button, .view-button { cursor: pointer; }
         .review-item { transition: all 0.3s ease-in-out; }
+        /* Animation for the notification toast */
         @keyframes fadeInOut {
             0%, 100% { opacity: 0; transform: translateY(20px); }
             10%, 90% { opacity: 1; transform: translateY(0); }
         }
         .notification-toast { animation: fadeInOut 4s ease-in-out forwards; }
+        /* Styling for disabled elements */
         button:disabled, input:disabled, textarea:disabled { opacity: 0.5; cursor: not-allowed; }
-        .pac-container { background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.5rem; color: #d1d5db; z-index: 10000 !important; }
+        /* Styling for the Google Places Autocomplete dropdown */
+        .pac-container { background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.5rem; color: #d1d5db; z-index: 10000 !important; font-family: 'Inter', sans-serif; }
         .pac-item { padding: 0.75rem; cursor: pointer; border-top: 1px solid #374151; }
         .pac-item:first-child { border-top: none; }
         .pac-item:hover { background-color: #374151; }
         .pac-item-query { font-weight: 500; color: #f9fafb; }
+        /* Utility class to hide elements */
         .hidden { display: none; }
         .sticky-tabs { position: sticky; top: 0; z-index: 10; background-color: #111827; padding-top: 0.5rem; padding-bottom: 0.5rem; }
-        #map { height: 350px; border-radius: 0.75rem; }
+        #map { height: 350px; border-radius: 0.75rem; background-color: #374151; }
         .pac-target-input { padding: 0.75rem; width: 100%; }
     </style>
 </head>
@@ -39,7 +50,7 @@
 
     <div id="app" class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
-        <!-- Initial View: Choose Portal -->
+        <!-- Initial View: Portal Selection -->
         <div id="initial-view">
             <header class="text-center mb-12">
                 <h1 class="text-4xl sm:text-5xl font-bold text-white">Review Management Portal</h1>
@@ -61,46 +72,55 @@
             </div>
         </div>
 
-        <!-- Client View -->
+        <!-- Placeholder divs for different application views -->
         <div id="client-view" class="hidden"></div>
-        <!-- Owner View -->
         <div id="owner-view" class="hidden"></div>
-        <!-- Admin View -->
         <div id="admin-view" class="hidden"></div>
     </div>
     
-    <!-- MODALS & NOTIFICATIONS -->
+    <!-- Containers for modals and notifications -->
     <div id="login-modal-container"></div>
     <div id="generic-modal-container"></div>
     <div id="notification" class="hidden fixed bottom-5 right-5 bg-gray-800 border border-gray-700 text-white py-3 px-5 rounded-lg shadow-xl z-[10001]"></div>
     
     <script>
-        // Global callback for Google Maps API
+        // Global callback for Google Maps API. This function is called when the script is loaded.
         function initMaps() {
+            // Dispatch a custom event to let our application know the Maps API is ready.
             document.dispatchEvent(new Event('google-maps-loaded'));
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Main application object
             const app = {
                 // --- STATE ---
+                // Centralized state management for the entire application.
                 state: {
                     currentView: 'initial',
                     isClientLoggedIn: false, isOwnerLoggedIn: false, isAdminLoggedIn: false,
                     mapsInitialized: false,
+                    placesService: null, // To hold the Google Places Service instance
                     data: { companies: [] },
                     activeCompanyId: localStorage.getItem('activeCompanyTab') || null,
                     clientState: { link: '', reviews: [] },
                     ownerState: {
                         activeTab: 'submitter',
-                        link: '',
-                        reviews: [],
+                        // This object will hold all data for the currently selected company
+                        selectedPlace: {
+                            name: '',
+                            reviewLink: '',
+                            startingCount: 0,
+                            reviews: [], // To store reviews fetched from Google
+                            placeId: ''
+                        },
+                        reviews: [], // User-processed reviews
                         bulkText: '',
                         promptGenerator: { input: '', output: '' },
-                        placeFinder: { companyName: '', startingCount: 0, link: '' },
-                        sheetRow: { qtyToday: '', totalDone: '', reviewsOrdered: '', output: '' }
+                        sheetRow: { dailyReviews: '', reviewsOrdered: '', output: '' }
                     }
                 },
                 // --- DOM ELEMENTS ---
+                // Caching frequently accessed DOM elements.
                 elements: {
                     app: document.getElementById('app'),
                     initialView: document.getElementById('initial-view'),
@@ -115,31 +135,45 @@
                 init() {
                     this.loadData();
                     this.attachInitialListeners();
+                    // Listen for the custom event fired by initMaps()
                     document.addEventListener('google-maps-loaded', () => {
                         this.state.mapsInitialized = true;
-                        // If a view requiring maps is already active, initialize it now
-                        if (this.state.currentView === 'owner' && this.state.ownerState.activeTab === 'tools') {
-                            this.initPlaceIdFinderMap();
-                        } else if (this.state.currentView !== 'initial'){
-                           this.initAutocompleteForView(this.state.currentView);
+                        if (this.state.currentView === 'owner') {
+                            this.initializeOwnerViewMaps();
                         }
                     });
                     this.render();
                 },
-                initAutocompleteForView(view) {
-                    const inputId = view === 'owner' ? 'owner-link-input' : 'client-link-input';
+
+                // --- GOOGLE MAPS & PLACES INTEGRATION ---
+                initializeOwnerViewMaps() {
+                    if (!this.state.mapsInitialized || this.state.currentView !== 'owner') return;
+                    
+                    // Delay to ensure the DOM is ready after rendering
+                    setTimeout(() => {
+                        this.initAutocomplete('owner-link-input');
+                        this.initPlaceIdFinderMap();
+                    }, 100);
+                },
+
+                initAutocomplete(inputId) {
                     const input = document.getElementById(inputId);
                     if (!input || input.dataset.acAttached) return;
-                    const autocomplete = new google.maps.places.Autocomplete(input, { fields: ["place_id", "name", "url"], types: ["establishment"] });
+
+                    // These are the fields we want from the Places API
+                    const autocompleteOptions = {
+                        fields: ["place_id", "name", "reviews", "user_ratings_total"],
+                        types: ["establishment"]
+                    };
+                    const autocomplete = new google.maps.places.Autocomplete(input, autocompleteOptions);
                     input.dataset.acAttached = 'true';
+
                     autocomplete.addListener('place_changed', () => {
                         const place = autocomplete.getPlace();
-                        if (place && place.place_id) {
-                            const reviewLink = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
-                            document.dispatchEvent(new CustomEvent('placeSelected', { detail: { link: reviewLink, view: view } }));
-                        }
+                        this.handlePlaceSelection(place);
                     });
                 },
+                
                 initPlaceIdFinderMap() {
                     if (!this.state.mapsInitialized) return;
                     const mapEl = document.getElementById("map");
@@ -147,25 +181,60 @@
                     if (!mapEl || !inputEl || inputEl.dataset.acAttached) return;
 
                     const map = new google.maps.Map(mapEl, { center: { lat: 1.3521, lng: 103.8198 }, zoom: 11 });
-                    const autocomplete = new google.maps.places.Autocomplete(inputEl, { fields: ["place_id", "geometry", "formatted_address", "name", "user_ratings_total"] });
+                    const autocomplete = new google.maps.places.Autocomplete(inputEl, { fields: ["place_id", "geometry", "name", "reviews", "user_ratings_total"] });
                     autocomplete.bindTo("bounds", map);
                     inputEl.dataset.acAttached = 'true';
                     const marker = new google.maps.Marker({ map: map });
 
                     autocomplete.addListener("place_changed", () => {
+                        marker.setVisible(false);
                         const place = autocomplete.getPlace();
-                        if (!place.geometry || !place.geometry.location) return;
-                        if (place.geometry.viewport) map.fitBounds(place.geometry.viewport);
-                        else { map.setCenter(place.geometry.location); map.setZoom(17); }
-                        marker.setPosition(place.geometry.location);
-                        marker.setVisible(true);
-                        
-                        this.state.ownerState.placeFinder.companyName = place.name || "";
-                        this.state.ownerState.placeFinder.startingCount = place.user_ratings_total || 0;
-                        this.state.ownerState.placeFinder.link = "https://search.google.com/local/writereview?placeid=" + place.place_id;
-                        this.render(); 
+                        if (place.geometry) {
+                           if (place.geometry.viewport) {
+                               map.fitBounds(place.geometry.viewport);
+                           } else {
+                               map.setCenter(place.geometry.location);
+                               map.setZoom(17);
+                           }
+                           marker.setPosition(place.geometry.location);
+                           marker.setVisible(true);
+                        }
+                        this.handlePlaceSelection(place); 
                     });
                 },
+
+                // Central handler for when a place is selected from any autocomplete input
+                handlePlaceSelection(place) {
+                    if (!place || !place.place_id) {
+                        this.showNotification("Could not retrieve company details. Please try again.", "error");
+                        return;
+                    }
+
+                    // Update the central state with the new place data
+                    const { ownerState } = this.state;
+                    ownerState.selectedPlace.name = place.name || '';
+                    ownerState.selectedPlace.placeId = place.place_id;
+                    ownerState.selectedPlace.reviewLink = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+                    ownerState.selectedPlace.startingCount = place.user_ratings_total || 0;
+                    
+                    // Filter for positive reviews (rating >= 4) and format them for the prompt generator
+                    if (place.reviews && place.reviews.length > 0) {
+                        const positiveReviews = place.reviews
+                            .filter(r => r.rating >= 4)
+                            .map(r => r.text);
+                        
+                        ownerState.selectedPlace.reviews = positiveReviews;
+                        ownerState.promptGenerator.input = positiveReviews.join('\n\n---\n\n');
+                    } else {
+                        ownerState.selectedPlace.reviews = [];
+                        ownerState.promptGenerator.input = 'No recent positive reviews found. You can paste your own points manually.';
+                    }
+                    
+                    this.showNotification(`Selected: ${place.name}`, "success");
+                    this.render(); // Re-render the entire view with the new data
+                },
+
+
                 // --- DATA PERSISTENCE ---
                 loadData() {
                     const savedData = localStorage.getItem('reviewDashboardData');
@@ -178,17 +247,23 @@
                     localStorage.setItem('reviewDashboardData', JSON.stringify(this.state.data));
                     this.showNotification("Admin data saved!");
                 },
+
                 // --- VIEW MANAGEMENT ---
                 switchView(view) {
                     this.state.currentView = view;
                     if ((view === 'client' && !this.state.isClientLoggedIn) || (view === 'owner' && !this.state.isOwnerLoggedIn) || (view === 'admin' && !this.state.isAdminLoggedIn)) {
                         this.showLoginModal(view); return;
                     }
-                    if (view === 'client') { this.state.clientState = { link: '', reviews: [] }; }
-                    if (view === 'owner') { this.state.ownerState = { activeTab: 'submitter', link: '', reviews: [], bulkText: '', promptGenerator: { input: '', output: '' }, placeFinder: { companyName: '', startingCount: 0, link: '' }, sheetRow: { qtyToday: '', totalDone: '', reviewsOrdered: '', output: '' } }; }
                     if (view === 'initial') { this.state.isClientLoggedIn = this.state.isOwnerLoggedIn = this.state.isAdminLoggedIn = false; }
+                    
                     this.render();
+
+                    // Initialize maps if switching to the owner view
+                    if(view === 'owner') {
+                        this.initializeOwnerViewMaps();
+                    }
                 },
+                
                 // --- RENDERING ---
                 render() {
                     const { initialView, clientView, ownerView, adminView } = this.elements;
@@ -197,11 +272,12 @@
                     ownerView.classList.toggle('hidden', this.state.currentView !== 'owner');
                     adminView.classList.toggle('hidden', this.state.currentView !== 'admin');
 
-                    if (this.state.currentView === 'client') { this.renderClientView(); setTimeout(() => this.initAutocompleteForView('client'), 50); }
+                    if (this.state.currentView === 'client') this.renderClientView();
                     if (this.state.currentView === 'owner') this.renderOwnerView();
                     if (this.state.currentView === 'admin') this.renderAdminView();
                 },
-                // --- OWNER VIEW ---
+                
+                // --- OWNER VIEW RENDERING ---
                 renderOwnerView() {
                     const { activeTab } = this.state.ownerState;
                     this.elements.ownerView.innerHTML = `
@@ -221,28 +297,30 @@
                         <div id="owner-prompt-generator-view" class="${activeTab !== 'promptGenerator' ? 'hidden' : ''}">${this.renderOwnerPromptGeneratorView()}</div>
                         <div id="owner-tools-view" class="${activeTab !== 'tools' ? 'hidden' : ''}">${this.renderOwnerToolsView()}</div>
                     `;
-                    if (activeTab === 'submitter') { setTimeout(() => this.initAutocompleteForView('owner'), 50); }
-                    if (activeTab === 'tools') { setTimeout(() => this.initPlaceIdFinderMap(), 50); }
+                    // Re-initialize maps after re-rendering, especially for the tools tab
+                     if(this.state.mapsInitialized) {
+                        this.initializeOwnerViewMaps();
+                    }
                 },
+                
                 renderOwnerSubmitterView() {
-                    const { link, reviews, bulkText } = this.state.ownerState;
-                    const isLinkSet = !!link;
+                    const { selectedPlace, reviews, bulkText } = this.state.ownerState;
+                    const isPlaceSelected = !!selectedPlace.placeId;
                     const areReviewsProcessed = reviews.length > 0;
                     return `
-                        <div id="owner-link-section" class="p-6 bg-gray-800 border border-gray-700 rounded-xl ${isLinkSet ? 'opacity-70' : ''}">
-                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Find Business or Paste Link</h2>
+                        <div id="owner-link-section" class="p-6 bg-gray-800 border border-gray-700 rounded-xl">
+                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Find Business</h2>
                              <div class="flex flex-col sm:flex-row gap-3">
-                                 <input type="text" id="owner-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for a business or paste link..." value="${link}" ${isLinkSet ? 'disabled' : ''}>
-                                 <button id="set-owner-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg" ${isLinkSet ? 'disabled' : ''}>${isLinkSet ? 'Link Set!' : 'Set Manually'}</button>
+                                 <input type="text" id="owner-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for a business by name..." value="${selectedPlace.name || ''}">
                              </div>
-                             <p id="owner-link-error" class="text-red-400 mt-2 text-sm hidden">Invalid link.</p>
+                             ${isPlaceSelected ? `<p class="text-sm text-green-400 mt-2">Review Link: <a href="${selectedPlace.reviewLink}" target="_blank" class="underline">${selectedPlace.reviewLink}</a></p>` : ''}
                         </div>
-                        <div id="owner-bulk-section" class="mt-8 p-6 bg-gray-800 border border-gray-700 rounded-xl ${!isLinkSet || areReviewsProcessed ? 'hidden' : ''}">
+                        <div id="owner-bulk-section" class="mt-8 p-6 bg-gray-800 border border-gray-700 rounded-xl ${!isPlaceSelected || areReviewsProcessed ? 'hidden' : ''}">
                             <h2 class="text-xl font-semibold text-white mb-4">Step 2: Paste All Reviews</h2>
-                            <textarea id="owner-bulk-textarea" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg h-60 resize-y">${bulkText}</textarea>
+                            <textarea id="owner-bulk-textarea" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg h-60 resize-y" placeholder="Paste reviews here, one per line...">${bulkText}</textarea>
                             <button id="process-bulk-reviews-btn" class="mt-4 w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Process Reviews</button>
                         </div>
-                        <div id="owner-reviews-section" class="mt-8 ${!isLinkSet || !areReviewsProcessed ? 'hidden' : ''}">
+                        <div id="owner-reviews-section" class="mt-8 ${!isPlaceSelected || !areReviewsProcessed ? 'hidden' : ''}">
                             <div class="mb-6 flex justify-between items-center">
                                 <h2 class="text-xl font-semibold text-white">Step 3: Manage Reviews (${reviews.length})</h2>
                                 <button id="reset-owner-reviews-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Start Over</button>
@@ -251,13 +329,14 @@
                             <div class="mt-8 pt-6 border-t border-gray-700"> <button id="download-owner-file-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button> </div>
                         </div>`;
                 },
+                
                 renderOwnerPromptGeneratorView() {
                     const { input, output } = this.state.ownerState.promptGenerator;
                     return `
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div class="p-6 bg-gray-800 border border-gray-700 rounded-xl">
                                 <h2 class="text-xl font-semibold text-white mb-4">Review Points</h2>
-                                <p class="text-sm text-gray-400 mb-3">These points are auto-filled from the 'Review Submitter' tab. You can also add or edit them manually.</p>
+                                <p class="text-sm text-gray-400 mb-3">These points are auto-filled from the selected company's recent positive Google reviews. You can also add or edit them manually.</p>
                                 <textarea id="prompt-generator-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg h-80 resize-y">${input}</textarea>
                                 <button id="generate-prompt-btn" class="mt-4 w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Generate Prompt</button>
                             </div>
@@ -270,27 +349,28 @@
                             </div>
                         </div>`;
                 },
+                
                 renderOwnerToolsView() {
-                    const { placeFinder, sheetRow } = this.state.ownerState;
+                    const { selectedPlace, sheetRow } = this.state.ownerState;
                     return `
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <!-- Place ID Finder -->
                             <div class="p-6 bg-gray-800 border border-gray-700 rounded-xl space-y-4">
                                 <h2 class="text-xl font-semibold text-white">Place ID Finder</h2>
-                                <input type="text" id="pac-input" class="pac-target-input bg-gray-900 border border-gray-600 rounded-lg" placeholder="Enter a location">
+                                <input type="text" id="pac-input" class="pac-target-input bg-gray-900 border border-gray-600 rounded-lg" placeholder="Enter a location to find its review link">
                                 <div id="map"></div>
                                 <div class="relative mt-4">
-                                    <pre class="w-full p-3 pr-16 bg-gray-900 border border-gray-600 rounded-lg whitespace-pre-wrap overflow-x-auto">${placeFinder.link || 'Review link will appear here...'}</pre>
-                                    <button id="copy-place-link-btn" class="absolute top-1/2 right-3 -translate-y-1/2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-lg text-sm" ${!placeFinder.link ? 'disabled' : ''}>Copy</button>
+                                    <pre class="w-full p-3 pr-16 bg-gray-900 border border-gray-600 rounded-lg whitespace-pre-wrap overflow-x-auto">${selectedPlace.reviewLink || 'Review link will appear here...'}</pre>
+                                    <button id="copy-place-link-btn" class="absolute top-1/2 right-3 -translate-y-1/2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-lg text-sm" ${!selectedPlace.reviewLink ? 'disabled' : ''}>Copy</button>
                                 </div>
                             </div>
                             <!-- Google Sheet Row Generator -->
                             <div class="p-6 bg-gray-800 border border-gray-700 rounded-xl space-y-4 self-start">
                                 <h2 class="text-xl font-semibold text-white">Google Sheet Row Generator</h2>
-                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label><input type="text" value="${placeFinder.companyName}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
-                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Starting Review Count</label><input type="text" value="${placeFinder.startingCount}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
-                                <div><label for="quantity-today" class="block text-sm font-medium text-gray-300 mb-1">Quantity Today</label><input type="number" id="quantity-today" value="${sheetRow.qtyToday}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg"></div>
-                                <div><label for="total-done" class="block text-sm font-medium text-gray-300 mb-1">Total Done</label><input type="number" id="total-done" value="${sheetRow.totalDone}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg"></div>
+                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label><input type="text" value="${selectedPlace.name}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
+                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Starting Review Count</label><input type="text" value="${selectedPlace.startingCount}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
+                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Reviews Done</label><input type="text" value="0" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
+                                <div><label for="daily-reviews" class="block text-sm font-medium text-gray-300 mb-1">Daily Reviews</label><input type="number" id="daily-reviews" value="${sheetRow.dailyReviews}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg"></div>
                                 <div><label for="reviews-ordered" class="block text-sm font-medium text-gray-300 mb-1">Reviews Ordered</label><input type="number" id="reviews-ordered" value="${sheetRow.reviewsOrdered}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg"></div>
                                 <button id="generate-sheet-row-btn" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Generate Row</button>
                                 <div class="relative">
@@ -300,7 +380,7 @@
                             </div>
                         </div>`;
                 },
-                // --- CLIENT VIEW ---
+
                 renderClientView() {
                     const { link, reviews } = this.state.clientState;
                     const isLinkSet = !!link;
@@ -311,10 +391,10 @@
                         </div>
                         <header class="mb-8"><h1 class="text-3xl sm:text-4xl font-bold text-white">Client Review Submission</h1></header>
                         <div id="client-link-section" class="mt-8 p-6 bg-gray-800 border border-gray-700 rounded-xl ${isLinkSet ? 'opacity-70' : ''}">
-                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Find Business or Paste Link</h2>
+                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Paste Google Review Link</h2>
                              <div class="flex flex-col sm:flex-row gap-3">
-                                 <input type="text" id="client-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for a business or paste link..." value="${link}" ${isLinkSet ? 'disabled' : ''}>
-                                 <button id="set-client-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg" ${isLinkSet ? 'disabled' : ''}>${isLinkSet ? 'Link Set!' : 'Set Manually'}</button>
+                                 <input type="text" id="client-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Paste the business's Google Review link here..." value="${link}" ${isLinkSet ? 'disabled' : ''}>
+                                 <button id="set-client-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg" ${isLinkSet ? 'disabled' : ''}>${isLinkSet ? 'Link Set!' : 'Set Link'}</button>
                              </div>
                         </div>
                         <div id="client-reviews-section" class="mt-8 ${!isLinkSet ? 'hidden' : ''}">
@@ -326,7 +406,7 @@
                             <div class="mt-8 pt-6 border-t border-gray-700"> <button id="download-client-file-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button> </div>
                         </div>`;
                 },
-                // --- GENERIC REVIEW CARD RENDERER ---
+
                 renderReviewCards(viewType) {
                     const state = viewType === 'owner' ? this.state.ownerState : this.state.clientState;
                     const { reviews } = state;
@@ -375,7 +455,7 @@
                         </div>
                     `).join('');
                 },
-                // --- ADMIN VIEW (Full implementation) ---
+                
                 renderAdminView() {
                     this.elements.adminView.innerHTML = `
                         <div class="flex justify-between items-center mb-8">
@@ -473,73 +553,34 @@
                     this.elements.app.addEventListener('click', e => { if (e.target.closest('.back-to-initial-btn')) { this.switchView('initial'); } this.handleGenericClick(e); });
                     this.elements.app.addEventListener('input', e => this.handleGenericInput(e));
                     this.elements.app.addEventListener('change', e => this.handleGenericChange(e));
-                    document.addEventListener('placeSelected', e => this.handlePlaceSelected(e));
                 },
+                
                 // --- EVENT HANDLERS ---
                 handleOwnerTabClick(tab) {
                     this.state.ownerState.activeTab = tab;
-                    if (tab === 'promptGenerator' && this.state.ownerState.reviews.length > 0) {
-                        this.state.ownerState.promptGenerator.input = this.state.ownerState.reviews.map(r => r.text).join('\n\n');
-                    }
                     this.render();
+                    if(this.state.mapsInitialized) {
+                        this.initializeOwnerViewMaps();
+                    }
                 },
                 handleGenericClick(e) {
                     const target = e.target;
                     const view = this.state.currentView;
                     if (target.closest('.owner-tab-btn')) { this.handleOwnerTabClick(target.closest('.owner-tab-btn').dataset.tab); return; }
 
-                    // --- Client & Owner Shared ---
-                    if (target.id === `set-${view}-link-btn` && (view === 'client' || view === 'owner')) {
-                        const input = document.getElementById(`${view}-link-input`);
-                        const link = input.value;
-                        if (this.validateLink(link)) { this.state[`${view}State`].link = link; this.render(); } 
-                    }
-                    if (target.closest('.remove-review-btn')) {
-                        const btn = target.closest('.remove-review-btn');
-                        this.state[`${btn.dataset.view}State`].reviews.splice(btn.dataset.index, 1);
-                        this.render();
-                    }
-                    if (target.closest('.remove-image-btn')) {
-                        const btn = target.closest('.remove-image-btn');
-                        this.state[`${btn.dataset.view}State`].reviews[btn.dataset.reviewIndex].imageDataUrls.splice(btn.dataset.imageIndex, 1);
-                        this.render();
-                    }
-                     if (target.id === `download-${view}-file-btn`) {
-                        this.showPromptModal('Enter a filename', 'e.g., yourname_reviews', (filename) => {
-                            if (!filename) { this.showNotification('Download cancelled.', 'error'); return; }
-                            const safeFilename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
-                            const dataBlob = new Blob([JSON.stringify(this.state[`${view}State`], null, 2)], { type: 'application/json' });
-                            const url = URL.createObjectURL(dataBlob);
-                            const a = document.createElement('a');
-                            a.href = url; a.download = `${safeFilename}.json`;
-                            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-                            this.showNotification('File downloaded! Please send it to us.');
-                            this.state[`${view}State`] = { link: '', reviews: view === 'owner' ? [] : [], bulkText: '' };
-                            this.render();
-                        });
-                    }
-
-                    // --- Client Specific ---
-                    if (view === 'client') {
-                        if (target.id === 'how-to-use-btn') this.showInfoModal('How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Find Business:</strong> Use the search bar to find the business. Or, paste the Google Review link and click "Set Manually".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Check the "This review requires image(s)" box to show the uploader. Click it to select one or more pictures.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator.</li></ol>`); 
-                        if (target.id === 'add-client-review-btn') { this.state.clientState.reviews.unshift({ text: '', requiresImage: false, imageDataUrls: [] }); this.render(); }
-                    }
-
-                    // --- Owner Specific ---
                     if (view === 'owner') {
                         if (target.id === 'process-bulk-reviews-btn') this.processBulkReviews();
                         if (target.id === 'reset-owner-reviews-btn') { this.state.ownerState.reviews = []; this.state.ownerState.bulkText = ''; this.render(); }
                         if (target.id === 'generate-prompt-btn') this.generateOwnerPrompt();
                         if (target.id === 'copy-prompt-btn') this.copyToClipboard(this.state.ownerState.promptGenerator.output, "Prompt copied!");
-                        if (target.id === 'copy-place-link-btn') this.copyToClipboard(this.state.ownerState.placeFinder.link, "Place link copied!");
+                        if (target.id === 'copy-place-link-btn') this.copyToClipboard(this.state.ownerState.selectedPlace.reviewLink, "Place link copied!");
                         if (target.id === 'generate-sheet-row-btn') this.generateSheetRow();
                         if (target.id === 'copy-sheet-row-btn') this.copyToClipboard(this.state.ownerState.sheetRow.output, "Sheet row copied!");
                     }
                     
-                    // --- Admin Specific ---
                     if (view === 'admin') { this.handleAdminClick(e); }
                 },
-                 handleAdminClick(e) {
+                handleAdminClick(e) {
                     const target = e.target;
                     
                     if(target.id === 'add-company-btn') {
@@ -619,53 +660,23 @@
                 },
                 handleGenericInput(e) {
                     const target = e.target;
-                    const view = target.dataset.view;
-                     if (target.classList.contains('content-input') && (view === 'client' || view === 'owner')) {
-                        this.state[`${view}State`].reviews[target.dataset.index].text = target.value;
-                    }
-                     if (target.id === 'owner-bulk-textarea') {
-                        this.state.ownerState.bulkText = target.value;
-                    }
-                    if (target.id === 'prompt-generator-input') {
+                     if (target.id === 'prompt-generator-input') {
                         this.state.ownerState.promptGenerator.input = target.value;
                     }
-                    if (['quantity-today', 'total-done', 'reviews-ordered'].includes(target.id)) {
+                    if (['daily-reviews', 'reviews-ordered'].includes(target.id)) {
                         const key = {
-                            'quantity-today': 'qtyToday',
-                            'total-done': 'totalDone',
+                            'daily-reviews': 'dailyReviews',
                             'reviews-ordered': 'reviewsOrdered'
                         }[target.id];
                         this.state.ownerState.sheetRow[key] = target.value;
                     }
                 },
-                async handleGenericChange(e) {
-                    const target = e.target;
-                    const view = target.dataset.view;
-                    const index = target.dataset.index;
-                    if (target.classList.contains('image-required-toggle') && (view === 'client' || view === 'owner')) {
-                        this.state[`${view}State`].reviews[index].requiresImage = target.checked;
-                        if (!target.checked) { this.state[`${view}State`].reviews[index].imageDataUrls = []; }
-                        this.render();
-                    }
-                    if (target.classList.contains('image-input') && (view === 'client' || view === 'owner')) {
-                        const files = target.files;
-                        if (files.length > 0) {
-                            this.showNotification(`Compressing ${files.length} image(s)...`, 'info');
-                            for (const file of files) {
-                                try {
-                                    const compressedDataUrl = await this.compressImage(file);
-                                    this.state[`${view}State`].reviews[index].imageDataUrls.push(compressedDataUrl);
-                                } catch (err) { this.showNotification(`Could not process ${file.name}.`, 'error'); }
-                            }
-                            this.render();
-                            this.showNotification('Images added successfully.');
-                        }
-                    }
-                     if (this.state.currentView === 'admin' && e.target.classList.contains('upload-admin-file')) {
+                handleGenericChange(e) {
+                    if (this.state.currentView === 'admin' && e.target.classList.contains('upload-admin-file')) {
                         this.handleAdminChange(e);
                     }
                 },
-                 handleAdminChange(e) {
+                handleAdminChange(e) {
                     if (e.target.classList.contains('upload-admin-file')) {
                         const file = e.target.files[0];
                         const companyId = e.target.dataset.id;
@@ -692,13 +703,7 @@
                         }
                     }
                 },
-                handlePlaceSelected(e) { 
-                    const { link, view } = e.detail;
-                    if(this.state.currentView === view && this.validateLink(link)) {
-                        this.state[`${view}State`].link = link;
-                        this.render();
-                    } 
-                },
+
                 // --- OWNER-SPECIFIC METHODS ---
                 processBulkReviews() {
                     const { bulkText } = this.state.ownerState;
@@ -711,24 +716,32 @@
                 },
                 generateOwnerPrompt() {
                     const extraInput = this.state.ownerState.promptGenerator.input.trim();
-                    const points = extraInput ? extraInput : "the points above";
                     if (!extraInput) { this.showNotification("Please provide some review points first.", "error"); return; }
-                    const promptText = `${points}\n\nbased on the points above Craft 50 positive detailed reviews based on the above context and strictly follow the requirements outlined below\nRequirements:\n- Company Name Usage: Do not include the company name in every review. Only insert it into some of the reviews (e.g., Reviews 1, 3, 5, 7, and 10). The rest should use general terms like “the team,” “the service,” “they,” or refer to the experience without naming the company. This prevents repetition and makes the reviews sound more natural.\n\nSentence Structure Variety: Avoid repeating the same sentence pattern across all reviews. Do not follow a fixed format like:\n“John is the best! The service was amazing. Highly recommended!”\nInstead, vary the tone, style, and flow:\n\nStart some reviews with a personal story\n\nUse different emotional tones (excited, grateful, surprised, relaxed, etc.)\n\nMix short and long sentences\n\nVary the structure: some can be casual, others formal or descriptive\n\nRealism and Authenticity: Make it sound like 10 different real people wrote the reviews. Include specific, realistic details, and even small flaws or neutral remarks followed by praise in one or two reviews (e.g., “Had to wait 5 minutes, but it was worth it”), to improve credibility.\n\nRandomize the Review Lengths: Do not make all reviews long, all short, or follow a predictable pattern like alternating between long and short. Instead, randomize the length of each review naturally.\n\nSome reviews should be short and snappy (e.g., 5–10 words: “Fast service. Super satisfied!” or “Will return. Great experience.”)\n\nOthers should be medium length (2–4 sentences), and a few should be long and detailed (4–8+ sentences with specific details and storytelling).\n\nAvoid Patterns: The order of lengths should feel random, like:\nLong, short, short, long, medium, short, long, short, long, medium\nThis prevents detection when reviews are posted in sequence and makes the overall output more human-like.\n\nVocabulary Variety – Prioritize Simplicity, Mix in Depth:\nMost reviews should use simple, everyday English—casual tone, easy vocabulary, and natural phrasing that resembles how an average person would write a quick review. Avoid sounding too polished or robotic.\nHowever, include 1 or 2 reviews that use slightly more advanced vocabulary or articulate phrasing, as if written by a well-spoken or expressive customer. This adds realism and makes the full set of reviews sound more diverse and believable.\nExamples:\n\nSimple: “Fast service, friendly staff. Will come back.”\n\nSlightly refined: “From start to finish, the entire process was smooth, efficient, and exceeded my expectations.”\n\nAvoid Overly Promotional or Dramatic Tone:\nThe reviews should sound natural and conversational, like something a real customer would post—not exaggerated or overly enthusiastic. Avoid phrases that sound scripted, fake, or too good to be true (e.g., “Absolutely flawless!”, “10/10 best ever!”, “I’m speechless!”).\nInstead, use subtle praise, realistic appreciation, and moderate expressions. Some reviews can include small imperfections or minor observations (e.g., “Had to wait a bit, but it was worth it”) to sound more believable.\nThe goal is to make the reviews feel like genuine customer reflections, not advertising.\n\nVary Writing Voice Slightly:\nConsider introducing slight differences in writing style—some reviews can be casual and relaxed (“super chill vibe, loved it”), while others are more formal or proper. One or two may include emojis or casual lingo to mimic the variety of people on Google. You can even include 1 broken-English style review if the brand serves a wide customer base.\n\nRandomized Capitalization Styles:\nVary capitalization across different reviews to reflect real-world typing habits. Some reviews should follow proper sentence case (e.g., “The service was great.”), while others should reflect auto-capitalization being off or inconsistent (e.g., “great experience. will definitely return.”). This variation should be randomly spread out, not patterned. Do not apply improper casing to all or most reviews—only a few should use it inconsistently to mimic natural human typing.\n\nLow-Frequency Emoji Usage:\nInclude emojis in only 1 out of every 10 reviews (or fewer). The emoji should be context-appropriate (e.g., 😊, 👍, 🙌), and placed naturally at the end or mid-sentence. Avoid overusing emojis or putting them in every review, as that reduces authenticity. Most real users don’t use emojis in Google reviews—only the occasional expressive person does.\n\nAvoid Non-Standard Punctuation:\nDo not use unusual punctuation marks like colons (:), semicolons (;), dashes (-) or em dashes (—) within reviews. Real reviewers rarely take the time to format their writing this precisely. Stick to simple, natural punctuation: periods (.), commas (,), exclamation points (!) used sparingly, and question marks (?) only when contextually necessary.\n\nInclude Casual Time References in Some Reviews:\nIn 3 reviews, include a soft time reference like “visited last week,” “came here yesterday,” “this morning was my first time,” or “been here twice this month.” This adds a sense of real-time behavior and improves believability.\n\nVary Reviewer Contexts Subtly:\nIn a few reviews, mention small contextual clues that hint at different demographics or scenarios (e.g., “great spot for a quick lunch break,” “brought my kids and they loved it,” “perfect after a long day at work”). This helps make the pool of reviews feel like they came from diverse customers.\n\nUse Specific, Natural Details Without Copying Full Names:\nWhen known, include realistic and specific references to services, products, staff, or actions (e.g., “the sambal chicken was crispy,” “Jane at the front desk was super helpful,” “checkout was quick and smooth”). These details add realism and depth to the review.\nHowever, do not quote full item names exactly as listed in menus, brochures, or catalogs. Simplify them into natural, conversational descriptions, as a real customer would say casually.\nFor example:\n\n❌ “Three Piece Fried Chicken with Sambal Chilli and Coke with Mayo Sauce – Best Seller”\n✅ “Tried the sambal chicken combo it is delicious.”\n\n❌ “Premium Platinum Lock Installation with NFC Key System”\n✅ “They installed an NFC lock for me super smooth process.”\n\nAvoid Repeating the Same Business or Item Names Across Consecutive Reviews:\nDo not repeat the exact business name, product name, food name, or service name in multiple reviews back-to-back. Spread them out randomly across the full set of reviews.\n\nOnly include the business name in a few randomly selected reviews, not in all. The rest should refer to the business with general terms like “this place,” “the team,” “the restaurant,” or skip naming entirely.\n\nSimilarly, if referencing food or product names (e.g., “salted egg pork rib”, “crispy chicken mid wings”), do not repeat the same item across reviews unless it makes natural sense (e.g., being a top-seller). Even then, ensure the phrasing is varied and mention is spaced out—not clustered together.\n\n✔️ Examples:\n\n“Had dinner at Golden Spoon Seafood last night…”\n\n“This spot serves the crispiest cereal prawns.”\n\n“We tried the pork rib dish—real comfort food.”\n\n“Kids loved the fried stuff, portions were generous.”\n\nThis spacing makes the reviews feel like they were written by different people on different days, and prevents artificial repetition.\n\ntrict Limit on Business Name Mentions (Per 5 Reviews):\nTo maintain realism and avoid obvious patterns, only mention the business or brand name once for every 5 reviews. The rest should use general references like “this place,” “the restaurant,” “the team,” or no name at all.\nWithin each 5-review block, randomize which review contains the business name—do not always use it in the 1st or 5th review.\nThis means:\n\nReviews 1–5 → only one should contain the brand name (randomly selected)\n\nReviews 6–10 → again, only one\n\nReviews 11–15 → same rule applies and so on for the rest of the reviews\n\nThis rule applies regardless of total review count, ensuring name usage is well-distributed and never repetitive.\n\nFormatting the reviews, do not number the reviews. Separate each review with a new line. \n\nExample format:\n\ncontent 1 \n\ncontent 2`;
+                    
+                    const promptText = `${extraInput}\n\nbased on the points above Craft 50 positive detailed reviews. Focus only on positive aspects mentioned and ignore any negative input. Strictly follow the requirements outlined below:\nRequirements:\n- Company Name Usage: Do not include the company name in every review. Only insert it into some of the reviews (e.g., Reviews 1, 3, 5, 7, and 10). The rest should use general terms like “the team,” “the service,” “they,” or refer to the experience without naming the company. This prevents repetition and makes the reviews sound more natural.\n\nSentence Structure Variety: Avoid repeating the same sentence pattern across all reviews. Do not follow a fixed format like:\n“John is the best! The service was amazing. Highly recommended!”\nInstead, vary the tone, style, and flow:\n\nStart some reviews with a personal story\n\nUse different emotional tones (excited, grateful, surprised, relaxed, etc.)\n\nMix short and long sentences\n\nVary the structure: some can be casual, others formal or descriptive\n\nRealism and Authenticity: Make it sound like 10 different real people wrote the reviews. Include specific, realistic details, and even small flaws or neutral remarks followed by praise in one or two reviews (e.g., “Had to wait 5 minutes, but it was worth it”), to improve credibility.\n\nRandomize the Review Lengths: Do not make all reviews long, all short, or follow a predictable pattern like alternating between long and short. Instead, randomize the length of each review naturally.\n\nSome reviews should be short and snappy (e.g., 5–10 words: “Fast service. Super satisfied!” or “Will return. Great experience.”)\n\nOthers should be medium length (2–4 sentences), and a few should be long and detailed (4–8+ sentences with specific details and storytelling).\n\nAvoid Patterns: The order of lengths should feel random, like:\nLong, short, short, long, medium, short, long, short, long, medium\nThis prevents detection when reviews are posted in sequence and makes the overall output more human-like.\n\nVocabulary Variety – Prioritize Simplicity, Mix in Depth:\nMost reviews should use simple, everyday English—casual tone, easy vocabulary, and natural phrasing that resembles how an average person would write a quick review. Avoid sounding too polished or robotic.\nHowever, include 1 or 2 reviews that use slightly more advanced vocabulary or articulate phrasing, as if written by a well-spoken or expressive customer. This adds realism and makes the full set of reviews sound more diverse and believable.\n\nAvoid Overly Promotional or Dramatic Tone:\nThe reviews should sound natural and conversational, like something a real customer would post—not exaggerated or overly enthusiastic. Avoid phrases that sound scripted, fake, or too good to be true.\nInstead, use subtle praise, realistic appreciation, and moderate expressions.\n\nVary Writing Voice Slightly:\nConsider introducing slight differences in writing style—some reviews can be casual and relaxed (“super chill vibe, loved it”), while others are more formal or proper. One or two may include emojis or casual lingo to mimic the variety of people on Google.\n\nRandomized Capitalization Styles:\nVary capitalization across different reviews to reflect real-world typing habits. Some reviews should follow proper sentence case, while others should reflect auto-capitalization being off or inconsistent. This variation should be randomly spread out, not patterned.\n\nLow-Frequency Emoji Usage:\nInclude emojis in only 1 out of every 10 reviews (or fewer). The emoji should be context-appropriate (e.g., 😊, 👍, 🙌), and placed naturally.\n\nAvoid Non-Standard Punctuation:\nStick to simple, natural punctuation: periods (.), commas (,), exclamation points (!) used sparingly.\n\nInclude Casual Time References in Some Reviews:\nIn 3 reviews, include a soft time reference like “visited last week,” “came here yesterday,” or “this morning was my first time.”\n\nVary Reviewer Contexts Subtly:\nIn a few reviews, mention small contextual clues that hint at different demographics or scenarios (e.g., “great spot for a quick lunch break,” “brought my kids and they loved it”).\n\nUse Specific, Natural Details Without Copying Full Names:\nWhen known, include realistic and specific references to services, products, staff, or actions (e.g., “the sambal chicken was crispy,” “Jane at the front desk was super helpful”). Simplify them into natural, conversational descriptions.\n\nAvoid Repeating the Same Business or Item Names Across Consecutive Reviews:\nDo not repeat the exact business name, product name, or service name in multiple reviews back-to-back. Spread them out randomly. Only include the business name in a few randomly selected reviews.\n\nStrict Limit on Business Name Mentions (Per 5 Reviews):\nOnly mention the business or brand name once for every 5 reviews. The rest should use general references.\n\nFormatting the reviews, do not number the reviews. Separate each review with a new line.`;
+                    
                     this.state.ownerState.promptGenerator.output = promptText;
                     this.render();
                     this.showNotification("Prompt generated!");
                 },
                 generateSheetRow() {
-                    const { companyName, startingCount } = this.state.ownerState.placeFinder;
-                    if (!companyName) { this.showNotification("Please search and select a company first.", "error"); return; }
-                    const qToday = parseInt(this.state.ownerState.sheetRow.qtyToday, 10) || 0;
-                    const tDone = parseInt(this.state.ownerState.sheetRow.totalDone, 10) || 0;
-                    const rOrdered = parseInt(this.state.ownerState.sheetRow.reviewsOrdered, 10) || 0;
-                    const endingCount = startingCount + rOrdered;
-                    const reviewsLeft = rOrdered - tDone;
-                    this.state.ownerState.sheetRow.output = `${companyName}\t${qToday}\t${tDone}\t${rOrdered}\t${startingCount}\t${endingCount}\t\t${reviewsLeft}`;
+                    const { name, startingCount } = this.state.ownerState.selectedPlace;
+                    if (!name) { this.showNotification("Please search and select a company first.", "error"); return; }
+                    
+                    const daily = parseInt(this.state.ownerState.sheetRow.dailyReviews, 10) || 0;
+                    const ordered = parseInt(this.state.ownerState.sheetRow.reviewsOrdered, 10) || 0;
+                    const done = 0; // Default as per requirement
+                    
+                    const endingCount = startingCount + ordered;
+                    const reviewsLeft = ordered - done;
+                    
+                    // The output format is Tab-Separated for easy pasting into Google Sheets
+                    const output = `${name}\t${daily}\t${done}\t${ordered}\t${startingCount}\t${endingCount}\t\t${reviewsLeft}`;
+                    this.state.ownerState.sheetRow.output = output;
                     this.render();
+                    this.showNotification("Sheet row generated!");
                 },
+
                 // --- UTILITIES & MODALS ---
                 compressImage(file, quality = 0.7, maxWidth = 1024) {
                     return new Promise((resolve, reject) => {
@@ -809,17 +822,37 @@
                 },
                 validateLink(link) { return link && (link.startsWith('http://') || link.startsWith('https://')); },
                 copyToClipboard(text, message = "Copied to clipboard!") {
-                    if (!navigator.clipboard) { this.showNotification("Clipboard not supported.", 'error'); return; }
+                    if (!navigator.clipboard) { 
+                        // Fallback for older browsers
+                        const textArea = document.createElement("textarea");
+                        textArea.value = text;
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                            this.showNotification(message);
+                        } catch (err) {
+                            this.showNotification("Failed to copy.", 'error');
+                        }
+                        document.body.removeChild(textArea);
+                        return;
+                    }
                     navigator.clipboard.writeText(text).then(() => { this.showNotification(message); }, () => { this.showNotification("Failed to copy.", 'error'); });
                 },
                 showNotification(message, type = 'success') {
                     const el = this.elements.notification;
                     el.textContent = message;
                     el.className = `notification-toast fixed bottom-5 right-5 text-white py-3 px-5 rounded-lg shadow-xl z-[10001] ${type === 'info' ? 'bg-blue-600' : type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
-                    setTimeout(() => el.classList.add('hidden'), 4000);
+                    el.classList.remove('hidden');
+                    // Reset animation
+                    el.style.animation = 'none';
+                    el.offsetHeight; /* trigger reflow */
+                    el.style.animation = null; 
+                    setTimeout(() => el.classList.add('hidden'), 3900);
                 }
             };
-
+            
             app.init();
         });
     </script>
