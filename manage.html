@@ -138,8 +138,11 @@
                     // Listen for the custom event fired by initMaps()
                     document.addEventListener('google-maps-loaded', () => {
                         this.state.mapsInitialized = true;
+                        // Initialize maps if a view requiring them is already active
                         if (this.state.currentView === 'owner') {
                             this.initializeOwnerViewMaps();
+                        } else if (this.state.currentView === 'admin') {
+                             this.render(); // Re-render admin to attach maps
                         }
                     });
                     this.render();
@@ -149,20 +152,28 @@
                 initializeOwnerViewMaps() {
                     if (!this.state.mapsInitialized || this.state.currentView !== 'owner') return;
                     
-                    // Delay to ensure the DOM is ready after rendering
                     setTimeout(() => {
-                        this.initAutocomplete('owner-link-input');
+                        this.initAutocomplete('owner-link-input', this.handlePlaceSelection.bind(this));
                         this.initPlaceIdFinderMap();
                     }, 100);
                 },
+                
+                initializeAdminViewMaps() {
+                     if (!this.state.mapsInitialized || this.state.currentView !== 'admin') return;
+                     setTimeout(() => {
+                        const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
+                        if(company) {
+                            this.initAutocomplete(`admin-link-input-${company.id}`, (place) => this.handleAdminPlaceSelection(place, company.id));
+                        }
+                    }, 100);
+                },
 
-                initAutocomplete(inputId) {
+                initAutocomplete(inputId, callback) {
                     const input = document.getElementById(inputId);
                     if (!input || input.dataset.acAttached) return;
 
-                    // These are the fields we want from the Places API
                     const autocompleteOptions = {
-                        fields: ["place_id", "name", "reviews", "user_ratings_total"],
+                        fields: ["place_id", "name", "reviews", "user_ratings_total", "url"],
                         types: ["establishment"]
                     };
                     const autocomplete = new google.maps.places.Autocomplete(input, autocompleteOptions);
@@ -170,7 +181,7 @@
 
                     autocomplete.addListener('place_changed', () => {
                         const place = autocomplete.getPlace();
-                        this.handlePlaceSelection(place);
+                        callback(place);
                     });
                 },
                 
@@ -190,12 +201,8 @@
                         marker.setVisible(false);
                         const place = autocomplete.getPlace();
                         if (place.geometry) {
-                           if (place.geometry.viewport) {
-                               map.fitBounds(place.geometry.viewport);
-                           } else {
-                               map.setCenter(place.geometry.location);
-                               map.setZoom(17);
-                           }
+                           if (place.geometry.viewport) map.fitBounds(place.geometry.viewport);
+                           else { map.setCenter(place.geometry.location); map.setZoom(17); }
                            marker.setPosition(place.geometry.location);
                            marker.setVisible(true);
                         }
@@ -203,26 +210,32 @@
                     });
                 },
 
-                // Central handler for when a place is selected from any autocomplete input
+                handleAdminPlaceSelection(place, companyId) {
+                    if (!place || !place.place_id) return;
+                    const company = this.state.data.companies.find(c => c.id === companyId);
+                    if (company) {
+                        company.reviewLink = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+                        company.name = place.name;
+                        this.saveData();
+                        this.render();
+                        this.showNotification(`Updated link for ${place.name}`);
+                    }
+                },
+
                 handlePlaceSelection(place) {
                     if (!place || !place.place_id) {
                         this.showNotification("Could not retrieve company details. Please try again.", "error");
                         return;
                     }
 
-                    // Update the central state with the new place data
                     const { ownerState } = this.state;
                     ownerState.selectedPlace.name = place.name || '';
                     ownerState.selectedPlace.placeId = place.place_id;
                     ownerState.selectedPlace.reviewLink = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
                     ownerState.selectedPlace.startingCount = place.user_ratings_total || 0;
                     
-                    // Filter for positive reviews (rating >= 4) and format them for the prompt generator
                     if (place.reviews && place.reviews.length > 0) {
-                        const positiveReviews = place.reviews
-                            .filter(r => r.rating >= 4)
-                            .map(r => r.text);
-                        
+                        const positiveReviews = place.reviews.filter(r => r.rating >= 4).map(r => r.text);
                         ownerState.selectedPlace.reviews = positiveReviews;
                         ownerState.promptGenerator.input = positiveReviews.join('\n\n---\n\n');
                     } else {
@@ -231,17 +244,22 @@
                     }
                     
                     this.showNotification(`Selected: ${place.name}`, "success");
-                    this.render(); // Re-render the entire view with the new data
+                    this.render();
                 },
-
 
                 // --- DATA PERSISTENCE ---
                 loadData() {
                     const savedData = localStorage.getItem('reviewDashboardData');
-                    if (savedData) { this.state.data = JSON.parse(savedData); if (!this.state.data.companies) this.state.data.companies = []; }
+                    if (savedData) { 
+                        this.state.data = JSON.parse(savedData); 
+                        if (!this.state.data.companies) this.state.data.companies = []; 
+                    }
                     const activeTab = localStorage.getItem('activeCompanyTab');
-                    if (activeTab && this.state.data.companies.find(c => c.id === activeTab)) { this.state.activeCompanyId = activeTab; } 
-                    else if (this.state.data.companies.length > 0) { this.state.activeCompanyId = this.state.data.companies[0].id; }
+                    if (activeTab && this.state.data.companies.find(c => c.id === activeTab)) { 
+                        this.state.activeCompanyId = activeTab; 
+                    } else if (this.state.data.companies.length > 0) { 
+                        this.state.activeCompanyId = this.state.data.companies[0].id; 
+                    }
                 },
                 saveData() {
                     localStorage.setItem('reviewDashboardData', JSON.stringify(this.state.data));
@@ -252,15 +270,16 @@
                 switchView(view) {
                     this.state.currentView = view;
                     if ((view === 'client' && !this.state.isClientLoggedIn) || (view === 'owner' && !this.state.isOwnerLoggedIn) || (view === 'admin' && !this.state.isAdminLoggedIn)) {
-                        this.showLoginModal(view); return;
+                        this.showLoginModal(view); 
+                        return;
                     }
                     if (view === 'initial') { this.state.isClientLoggedIn = this.state.isOwnerLoggedIn = this.state.isAdminLoggedIn = false; }
                     
                     this.render();
 
-                    // Initialize maps if switching to the owner view
-                    if(view === 'owner') {
-                        this.initializeOwnerViewMaps();
+                    if(this.state.mapsInitialized) {
+                        if(view === 'owner') this.initializeOwnerViewMaps();
+                        if(view === 'admin') this.initializeAdminViewMaps();
                     }
                 },
                 
@@ -297,10 +316,7 @@
                         <div id="owner-prompt-generator-view" class="${activeTab !== 'promptGenerator' ? 'hidden' : ''}">${this.renderOwnerPromptGeneratorView()}</div>
                         <div id="owner-tools-view" class="${activeTab !== 'tools' ? 'hidden' : ''}">${this.renderOwnerToolsView()}</div>
                     `;
-                    // Re-initialize maps after re-rendering, especially for the tools tab
-                     if(this.state.mapsInitialized) {
-                        this.initializeOwnerViewMaps();
-                    }
+                    if(this.state.mapsInitialized) this.initializeOwnerViewMaps();
                 },
                 
                 renderOwnerSubmitterView() {
@@ -332,8 +348,7 @@
                 
                 renderOwnerPromptGeneratorView() {
                     const { input, output } = this.state.ownerState.promptGenerator;
-                    return `
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div class="p-6 bg-gray-800 border border-gray-700 rounded-xl">
                                 <h2 class="text-xl font-semibold text-white mb-4">Review Points</h2>
                                 <p class="text-sm text-gray-400 mb-3">These points are auto-filled from the selected company's recent positive Google reviews. You can also add or edit them manually.</p>
@@ -349,12 +364,9 @@
                             </div>
                         </div>`;
                 },
-                
                 renderOwnerToolsView() {
                     const { selectedPlace, sheetRow } = this.state.ownerState;
-                    return `
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <!-- Place ID Finder -->
+                    return `<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div class="p-6 bg-gray-800 border border-gray-700 rounded-xl space-y-4">
                                 <h2 class="text-xl font-semibold text-white">Place ID Finder</h2>
                                 <input type="text" id="pac-input" class="pac-target-input bg-gray-900 border border-gray-600 rounded-lg" placeholder="Enter a location to find its review link">
@@ -364,14 +376,28 @@
                                     <button id="copy-place-link-btn" class="absolute top-1/2 right-3 -translate-y-1/2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-lg text-sm" ${!selectedPlace.reviewLink ? 'disabled' : ''}>Copy</button>
                                 </div>
                             </div>
-                            <!-- Google Sheet Row Generator -->
                             <div class="p-6 bg-gray-800 border border-gray-700 rounded-xl space-y-4 self-start">
                                 <h2 class="text-xl font-semibold text-white">Google Sheet Row Generator</h2>
-                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label><input type="text" value="${selectedPlace.name}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
-                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Starting Review Count</label><input type="text" value="${selectedPlace.startingCount}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
-                                <div><label class="block text-sm font-medium text-gray-300 mb-1">Reviews Done</label><input type="text" value="0" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly></div>
-                                <div><label for="daily-reviews" class="block text-sm font-medium text-gray-300 mb-1">Daily Reviews</label><input type="number" id="daily-reviews" value="${sheetRow.dailyReviews}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg"></div>
-                                <div><label for="reviews-ordered" class="block text-sm font-medium text-gray-300 mb-1">Reviews Ordered</label><input type="number" id="reviews-ordered" value="${sheetRow.reviewsOrdered}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg"></div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">Company Name</label>
+                                    <input type="text" value="${selectedPlace.name}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">Starting Review Count</label>
+                                    <input type="text" value="${selectedPlace.startingCount}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">Reviews Done</label>
+                                    <input type="text" value="0" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" readonly>
+                                </div>
+                                <div>
+                                    <label for="daily-reviews" class="block text-sm font-medium text-gray-300 mb-1">Daily Reviews</label>
+                                    <input type="number" id="daily-reviews" value="${sheetRow.dailyReviews}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg">
+                                </div>
+                                <div>
+                                    <label for="reviews-ordered" class="block text-sm font-medium text-gray-300 mb-1">Reviews Ordered</label>
+                                    <input type="number" id="reviews-ordered" value="${sheetRow.reviewsOrdered}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg">
+                                </div>
                                 <button id="generate-sheet-row-btn" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Generate Row</button>
                                 <div class="relative">
                                     <pre id="sheet-output" class="w-full p-3 pr-16 bg-gray-900 border border-gray-600 rounded-lg whitespace-pre-wrap overflow-x-auto">${sheetRow.output || 'Sheet row will appear here...'}</pre>
@@ -380,7 +406,6 @@
                             </div>
                         </div>`;
                 },
-
                 renderClientView() {
                     const { link, reviews } = this.state.clientState;
                     const isLinkSet = !!link;
@@ -406,17 +431,16 @@
                             <div class="mt-8 pt-6 border-t border-gray-700"> <button id="download-client-file-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button> </div>
                         </div>`;
                 },
-
                 renderReviewCards(viewType) {
                     const state = viewType === 'owner' ? this.state.ownerState : this.state.clientState;
                     const { reviews } = state;
                     const cardColor = viewType === 'owner' ? 'teal' : 'blue';
 
-                    if(reviews.length === 0) {
-                         if (viewType === 'client') return '<p class="text-gray-400 text-center py-4">No reviews added yet. Click "Add New Review" to start.</p>';
-                         return '<p class="text-gray-400 text-center py-4">No reviews processed yet. Paste reviews in the box above and click "Process Reviews".</p>';
+                    if (reviews.length === 0) {
+                        if (viewType === 'client') return '<p class="text-gray-400 text-center py-4">No reviews added yet. Click "Add New Review" to start.</p>';
+                        return '<p class="text-gray-400 text-center py-4">No reviews processed yet. Paste reviews in the box above and click "Process Reviews".</p>';
                     }
-                    
+
                     return reviews.map((review, index) => `
                         <div class="review-item bg-gray-800 p-6 rounded-xl mb-6 border border-gray-700">
                             <div class="flex justify-between items-start mb-4">
@@ -455,7 +479,6 @@
                         </div>
                     `).join('');
                 },
-                
                 renderAdminView() {
                     this.elements.adminView.innerHTML = `
                         <div class="flex justify-between items-center mb-8">
@@ -499,11 +522,13 @@
                     return `
                         <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8">
                             <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
-                                <div>
+                                <div class="flex-1 min-w-[250px]">
                                   <h2 class="text-2xl font-bold text-white">${company.name}</h2>
-                                  <a href="${company.reviewLink || '#'}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all">${company.reviewLink || 'No review link set yet.'}</a>
+                                  <p class="text-sm text-gray-400 mb-2">Search to find/update company link:</p>
+                                  <input type="text" id="admin-link-input-${company.id}" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for company to get review link..." value="${company.name}">
+                                  ${company.reviewLink ? `<a href="${company.reviewLink}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all block mt-2">${company.reviewLink}</a>` : '<p class="text-sm text-yellow-400 mt-2">No review link set yet.</p>'}
                                 </div>
-                                <div class="grid grid-cols-2 gap-3 w-full md:w-auto">
+                                <div class="grid grid-cols-2 gap-3">
                                     <button data-id="${company.id}" class="copy-latest-undone-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg" ${undoneReviews.length === 0 ? 'disabled' : ''}>Copy Latest</button>
                                     <label class="file-input-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-center">
                                         Upload File <input type="file" data-id="${company.id}" class="upload-admin-file hidden" accept=".json">
@@ -545,7 +570,8 @@
                             </div>
                         </div>`;
                 },
-                // --- EVENT LISTENERS ---
+
+                // --- EVENT LISTENERS & HANDLERS (with fixes) ---
                 attachInitialListeners() {
                     document.getElementById('client-portal-btn').addEventListener('click', () => this.switchView('client'));
                     document.getElementById('owner-portal-btn').addEventListener('click', () => this.switchView('owner'));
@@ -555,20 +581,18 @@
                     this.elements.app.addEventListener('change', e => this.handleGenericChange(e));
                 },
                 
-                // --- EVENT HANDLERS ---
                 handleOwnerTabClick(tab) {
                     this.state.ownerState.activeTab = tab;
                     this.render();
-                    if(this.state.mapsInitialized) {
-                        this.initializeOwnerViewMaps();
-                    }
+                    if(this.state.mapsInitialized) this.initializeOwnerViewMaps();
                 },
                 handleGenericClick(e) {
                     const target = e.target;
-                    const view = this.state.currentView;
+                    const viewType = target.closest('[data-view]')?.dataset.view;
+                    
                     if (target.closest('.owner-tab-btn')) { this.handleOwnerTabClick(target.closest('.owner-tab-btn').dataset.tab); return; }
 
-                    if (view === 'owner') {
+                    if (this.state.currentView === 'owner') {
                         if (target.id === 'process-bulk-reviews-btn') this.processBulkReviews();
                         if (target.id === 'reset-owner-reviews-btn') { this.state.ownerState.reviews = []; this.state.ownerState.bulkText = ''; this.render(); }
                         if (target.id === 'generate-prompt-btn') this.generateOwnerPrompt();
@@ -578,7 +602,20 @@
                         if (target.id === 'copy-sheet-row-btn') this.copyToClipboard(this.state.ownerState.sheetRow.output, "Sheet row copied!");
                     }
                     
-                    if (view === 'admin') { this.handleAdminClick(e); }
+                    if (this.state.currentView === 'admin') this.handleAdminClick(e);
+
+                    // Generic handlers for both client and owner views
+                    if (viewType) {
+                        if (target.closest('.remove-review-btn')) {
+                            this.state[`${viewType}State`].reviews.splice(target.closest('.remove-review-btn').dataset.index, 1);
+                            this.render();
+                        }
+                         if (target.closest('.remove-image-btn')) {
+                            const btn = target.closest('.remove-image-btn');
+                            this.state[`${viewType}State`].reviews[btn.dataset.reviewIndex].imageDataUrls.splice(btn.dataset.imageIndex, 1);
+                            this.render();
+                        }
+                    }
                 },
                 handleAdminClick(e) {
                     const target = e.target;
@@ -589,13 +626,16 @@
                             const newCompany = { id: `comp_${Date.now()}`, name: nameInput.value.trim(), reviewLink: '', reviews: [] };
                             this.state.data.companies.push(newCompany);
                             this.state.activeCompanyId = newCompany.id;
-                            this.saveData(); this.render(); nameInput.value = '';
+                            this.saveData(); 
+                            this.render(); 
+                            nameInput.value = '';
                         }
                     }
                     if(target.closest('.company-tab-btn')) { 
                         this.state.activeCompanyId = target.closest('.company-tab-btn').dataset.id; 
                         localStorage.setItem('activeCompanyTab', this.state.activeCompanyId);
                         this.render(); 
+                        if(this.state.mapsInitialized) this.initializeAdminViewMaps();
                     }
                     if(target.closest('.remove-company-btn')) {
                         const id = target.closest('.remove-company-btn').dataset.id;
@@ -660,56 +700,97 @@
                 },
                 handleGenericInput(e) {
                     const target = e.target;
+                    const viewType = target.dataset.view;
+
+                     if (target.id === 'owner-bulk-textarea') {
+                        this.state.ownerState.bulkText = target.value;
+                    }
                      if (target.id === 'prompt-generator-input') {
                         this.state.ownerState.promptGenerator.input = target.value;
                     }
                     if (['daily-reviews', 'reviews-ordered'].includes(target.id)) {
-                        const key = {
-                            'daily-reviews': 'dailyReviews',
-                            'reviews-ordered': 'reviewsOrdered'
-                        }[target.id];
+                        const key = {'daily-reviews': 'dailyReviews', 'reviews-ordered': 'reviewsOrdered'}[target.id];
                         this.state.ownerState.sheetRow[key] = target.value;
                     }
-                },
-                handleGenericChange(e) {
-                    if (this.state.currentView === 'admin' && e.target.classList.contains('upload-admin-file')) {
-                        this.handleAdminChange(e);
+                    if(viewType && target.classList.contains('content-input')) {
+                        this.state[`${viewType}State`].reviews[target.dataset.index].text = target.value;
                     }
                 },
-                handleAdminChange(e) {
-                    if (e.target.classList.contains('upload-admin-file')) {
-                        const file = e.target.files[0];
-                        const companyId = e.target.dataset.id;
-                        if (file && companyId) {
-                             const reader = new FileReader();
-                             reader.onload = (event) => {
-                                 try {
-                                     const uploaded = JSON.parse(event.target.result);
-                                     if (this.validateLink(uploaded.link) && Array.isArray(uploaded.reviews)) {
-                                         const company = this.state.data.companies.find(c => c.id === companyId);
-                                         if(company) {
-                                             company.reviewLink = uploaded.link;
-                                             const existingReviewTexts = new Set((company.reviews || []).map(r => r.text));
-                                             const newReviews = uploaded.reviews.filter(r => !existingReviewTexts.has(r.text)).map(r => ({...r, status: 'undone'}));
-                                             company.reviews = [...newReviews, ...company.reviews || []];
-                                             this.saveData(); this.render();
-                                             this.showNotification(`${newReviews.length} new review(s) imported.`);
-                                         }
-                                     } else { this.showNotification('Invalid file format.', 'error'); }
-                                 } catch (err) { this.showNotification('Error reading file.', 'error'); } 
-                                 finally { e.target.value = ''; }
-                             };
-                             reader.readAsText(file);
+                async handleGenericChange(e) {
+                    const target = e.target;
+                    const viewType = target.dataset.view;
+
+                    if (this.state.currentView === 'admin' && target.classList.contains('upload-admin-file')) {
+                        this.handleAdminChange(e);
+                        return;
+                    }
+                    
+                    if(viewType) {
+                        const index = target.dataset.index;
+                        if (target.classList.contains('image-required-toggle')) {
+                            this.state[`${viewType}State`].reviews[index].requiresImage = target.checked;
+                            if (!target.checked) this.state[`${viewType}State`].reviews[index].imageDataUrls = [];
+                            this.render();
+                        }
+                        if (target.classList.contains('image-input')) {
+                            const files = target.files;
+                            if (files.length > 0) {
+                                this.showNotification(`Compressing ${files.length} image(s)...`, 'info');
+                                for (const file of files) {
+                                    try {
+                                        const compressedDataUrl = await this.compressImage(file);
+                                        this.state[`${viewType}State`].reviews[index].imageDataUrls.push(compressedDataUrl);
+                                    } catch (err) { this.showNotification(`Could not process ${file.name}.`, 'error'); }
+                                }
+                                this.render();
+                                this.showNotification('Images added successfully.');
+                            }
                         }
                     }
                 },
+                handleAdminChange(e) {
+                    const file = e.target.files[0];
+                    const companyId = e.target.dataset.id;
+                    if (file && companyId) {
+                         const reader = new FileReader();
+                         reader.onload = (event) => {
+                             try {
+                                 const uploaded = JSON.parse(event.target.result);
+                                 // Basic validation for the uploaded file structure
+                                 if (uploaded.link && this.validateLink(uploaded.link) && Array.isArray(uploaded.reviews)) {
+                                     const company = this.state.data.companies.find(c => c.id === companyId);
+                                     if(company) {
+                                         company.reviewLink = uploaded.link;
+                                         const existingReviewTexts = new Set((company.reviews || []).map(r => r.text));
+                                         const newReviews = uploaded.reviews
+                                             .filter(r => r.text && !existingReviewTexts.has(r.text)) // Ensure review has text and isn't a duplicate
+                                             .map(r => ({...r, status: 'undone'})); // Set status for new reviews
 
-                // --- OWNER-SPECIFIC METHODS ---
+                                         company.reviews = [...(company.reviews || []), ...newReviews];
+                                         this.saveData(); 
+                                         this.render();
+                                         this.showNotification(`${newReviews.length} new review(s) imported for ${company.name}.`);
+                                     }
+                                 } else { this.showNotification('Invalid file format. Must contain "link" and "reviews" array.', 'error'); }
+                             } catch (err) { 
+                                console.error("Error reading or parsing file:", err);
+                                this.showNotification('Error reading file. Make sure it is a valid JSON file.', 'error'); 
+                             } 
+                             finally { e.target.value = ''; } // Reset file input
+                         };
+                         reader.readAsText(file);
+                    }
+                },
+
+                // --- OWNER-SPECIFIC METHODS (with fixes) ---
                 processBulkReviews() {
                     const { bulkText } = this.state.ownerState;
                     const lines = bulkText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
                     const uniqueLines = [...new Set(lines)];
-                    if (uniqueLines.length === 0) { this.showNotification("No reviews found to process.", "error"); return; }
+                    if (uniqueLines.length === 0) { 
+                        this.showNotification("No reviews found to process.", "error"); 
+                        return; 
+                    }
                     this.state.ownerState.reviews = uniqueLines.map(line => ({ text: line, requiresImage: false, imageDataUrls: [] }));
                     this.showNotification(`${uniqueLines.length} unique reviews processed.`, "success");
                     this.render();
@@ -823,7 +904,6 @@
                 validateLink(link) { return link && (link.startsWith('http://') || link.startsWith('https://')); },
                 copyToClipboard(text, message = "Copied to clipboard!") {
                     if (!navigator.clipboard) { 
-                        // Fallback for older browsers
                         const textArea = document.createElement("textarea");
                         textArea.value = text;
                         document.body.appendChild(textArea);
@@ -845,7 +925,6 @@
                     el.textContent = message;
                     el.className = `notification-toast fixed bottom-5 right-5 text-white py-3 px-5 rounded-lg shadow-xl z-[10001] ${type === 'info' ? 'bg-blue-600' : type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
                     el.classList.remove('hidden');
-                    // Reset animation
                     el.style.animation = 'none';
                     el.offsetHeight; /* trigger reflow */
                     el.style.animation = null; 
