@@ -8,11 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- 
-      Your Google Maps API Key is included here.
-      The 'places' library is essential for autocomplete and place details.
-      'callback=initMaps' tells the API which function to call once it's loaded.
-    -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initMaps"></script>
     <style>
         /* Base styling for the page, using the Inter font */
@@ -50,7 +45,6 @@
 
     <div id="app" class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
-        <!-- Initial View: Portal Selection -->
         <div id="initial-view">
             <header class="text-center mb-12">
                 <h1 class="text-4xl sm:text-5xl font-bold text-white">Review Management Portal</h1>
@@ -72,13 +66,11 @@
             </div>
         </div>
 
-        <!-- Placeholder divs for different application views -->
         <div id="client-view" class="hidden"></div>
         <div id="owner-view" class="hidden"></div>
         <div id="admin-view" class="hidden"></div>
     </div>
     
-    <!-- Containers for modals and notifications -->
     <div id="login-modal-container"></div>
     <div id="generic-modal-container"></div>
     <div id="notification" class="hidden fixed bottom-5 right-5 bg-gray-800 border border-gray-700 text-white py-3 px-5 rounded-lg shadow-xl z-[10001]"></div>
@@ -153,8 +145,12 @@
                     if (!this.state.mapsInitialized || this.state.currentView !== 'owner') return;
                     
                     setTimeout(() => {
-                        this.initAutocomplete('owner-link-input', this.handlePlaceSelection.bind(this));
-                        this.initPlaceIdFinderMap();
+                        if (this.state.ownerState.activeTab === 'submitter') {
+                            this.initAutocomplete('owner-link-input', this.handlePlaceSelection.bind(this));
+                        }
+                        if (this.state.ownerState.activeTab === 'tools') {
+                            this.initPlaceIdFinderMap();
+                        }
                     }, 100);
                 },
                 
@@ -277,6 +273,7 @@
                     
                     this.render();
 
+                    // Post-render initialization for maps
                     if(this.state.mapsInitialized) {
                         if(view === 'owner') this.initializeOwnerViewMaps();
                         if(view === 'admin') this.initializeAdminViewMaps();
@@ -592,6 +589,29 @@
                     
                     if (target.closest('.owner-tab-btn')) { this.handleOwnerTabClick(target.closest('.owner-tab-btn').dataset.tab); return; }
 
+                    if (this.state.currentView === 'client') {
+                        if (target.id === 'add-client-review-btn') { this.state.clientState.reviews.unshift({ text: '', requiresImage: false, imageDataUrls: [] }); this.render(); }
+                        if (target.id === 'how-to-use-btn') { this.showInfoModal('How to Use the Client Portal', `<ol class="list-decimal list-inside space-y-3"><li><strong>Set Link:</strong> Paste the Google Review link and click "Set Link".</li><li><strong>Add Reviews:</strong> Click "Add New Review" to create a card.</li><li><strong>Write Content:</strong> Type your review in the text box.</li><li><strong>Add Images:</strong> Check the "This review requires image(s)" box to show the uploader. Click it to select pictures.</li><li><strong>Download File:</strong> When done, click "Download Submission File".</li><li><strong>Name Your File:</strong> A pop-up will ask for a filename (e.g., 'yourname_reviews').</li><li><strong>Send to Admin:</strong> The file will download to your device. Please send this <code>.json</code> file to the administrator.</li></ol>`); }
+                         if (target.id === 'set-client-link-btn') {
+                            const input = document.getElementById('client-link-input');
+                            if(this.validateLink(input.value)) { this.state.clientState.link = input.value; this.render(); }
+                        }
+                        if (target.id === 'download-client-file-btn') {
+                             this.showPromptModal('Enter a filename', 'e.g., yourname_reviews', (filename) => {
+                                if (!filename) { this.showNotification('Download cancelled.', 'error'); return; }
+                                const data = { link: this.state.clientState.link, reviews: this.state.clientState.reviews };
+                                const dataBlob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(dataBlob);
+                                const a = document.createElement('a');
+                                a.href = url; a.download = `${filename.replace(/\s+/g, '_')}.json`;
+                                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                                this.showNotification('File downloaded! Please send it to us.');
+                                this.state.clientState = { link: '', reviews: [] };
+                                this.render();
+                            });
+                        }
+                    }
+
                     if (this.state.currentView === 'owner') {
                         if (target.id === 'process-bulk-reviews-btn') this.processBulkReviews();
                         if (target.id === 'reset-owner-reviews-btn') { this.state.ownerState.reviews = []; this.state.ownerState.bulkText = ''; this.render(); }
@@ -600,6 +620,18 @@
                         if (target.id === 'copy-place-link-btn') this.copyToClipboard(this.state.ownerState.selectedPlace.reviewLink, "Place link copied!");
                         if (target.id === 'generate-sheet-row-btn') this.generateSheetRow();
                         if (target.id === 'copy-sheet-row-btn') this.copyToClipboard(this.state.ownerState.sheetRow.output, "Sheet row copied!");
+                        if (target.id === 'download-owner-file-btn') {
+                            this.showPromptModal('Enter a filename', 'e.g., company_reviews', (filename) => {
+                                if (!filename) { this.showNotification('Download cancelled.', 'error'); return; }
+                                const data = { link: this.state.ownerState.selectedPlace.reviewLink, reviews: this.state.ownerState.reviews };
+                                const dataBlob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(dataBlob);
+                                const a = document.createElement('a');
+                                a.href = url; a.download = `${filename.replace(/\s+/g, '_')}.json`;
+                                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                                this.showNotification('File downloaded!');
+                            });
+                        }
                     }
                     
                     if (this.state.currentView === 'admin') this.handleAdminClick(e);
