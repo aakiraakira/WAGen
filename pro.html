@@ -1,920 +1,686 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-  <meta charset="UTF-8" />
-  <!-- Prevent auto-zoom on mobile inputs -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Business Tools</title>
-  <!-- Load Inter Font from Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* Global Reset & Base Styles */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #000;
-      color: #fff;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .app-container {
-      max-width: 900px;
-      margin: 0 auto;
-      background-color: #111;
-      border-radius: 10px;
-      padding: 30px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    }
-    /* Main Tab Navigation */
-    .tab-nav {
-      display: flex;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #333;
-    }
-    .tab-nav button {
-      flex: 1;
-      padding: 12px;
-      background-color: #111;
-      color: #fff;
-      border: none;
-      border-bottom: 2px solid transparent;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background-color 0.3s ease, border-bottom 0.3s ease;
-    }
-    .tab-nav button:hover,
-    .tab-nav button.active {
-      background-color: #1a1a1a;
-      border-bottom: 2px solid #007AFF;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    /* Shared Styles for Containers & Buttons */
-    .actions-container,
-    .input-container,
-    .output-container,
-    .stats-container {
-      margin-bottom: 20px;
-    }
-    textarea, input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #444;
-      border-radius: 5px;
-      background-color: #222;
-      color: #fff;
-      resize: vertical;
-    }
-    .output {
-      background-color: #1a1a1a;
-      border: 1px solid #333;
-      padding: 15px;
-      margin-bottom: 15px;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      transition: background-color 0.3s ease;
-    }
-    /* Done state: subtle light green with black text */
-    .output.done {
-      background-color: #d4edda;
-      color: #000;
-    }
-    .output p {
-      margin: 0;
-      word-wrap: break-word;
-    }
-    .output a {
-      color: #007AFF;
-      text-decoration: none;
-    }
-    .output a:hover {
-      text-decoration: underline;
-    }
-    button.action-btn, button.copy-btn {
-      background-color: #007AFF;
-      color: #fff;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: background-color 0.3s ease, transform 0.2s ease;
-    }
-    button.action-btn:hover, button.copy-btn:hover {
-      background-color: #0051c7;
-      transform: translateY(-2px);
-    }
-    .stats-container {
-      text-align: center;
-      font-size: 18px;
-      font-weight: bold;
-      background-color: #1a1a1a;
-      padding: 10px;
-      border-radius: 8px;
-    }
-    /* Prompt Generator Styles */
-    .prompt-generator label {
-      font-weight: 600;
-      display: block;
-      margin-bottom: 8px;
-    }
-    .prompt-generator textarea {
-      height: 120px;
-    }
-    .prompt-generator .output-area {
-      background-color: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 5px;
-      padding: 12px;
-      min-height: 120px;
-      margin-top: 12px;
-      white-space: pre-wrap;
-    }
-    /* Place ID Finder Styles */
-    .place-finder label {
-      font-weight: 600;
-      display: block;
-      margin-bottom: 8px;
-    }
-    /* Map container for Place ID Finder */
-    .place-finder .search-container {
-      margin-bottom: 12px;
-    }
-    #map {
-      width: 100%;
-      height: 300px;
-      margin-bottom: 12px;
-      border: 1px solid #444;
-      border-radius: 5px;
-    }
-    .place-finder .output-area {
-      background-color: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 5px;
-      padding: 12px;
-      margin-bottom: 12px;
-      white-space: pre-wrap;
-    }
-    /* Multi-Company Manager Styles */
-    .multi-company-container h2 {
-      text-align: center;
-      margin-bottom: 15px;
-    }
-    .multi-company-container .tabs-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .multi-company-container .tab-button {
-      background-color: #111;
-      border: none;
-      border-radius: 5px;
-      padding: 10px 15px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-      color: #fff;
-      position: relative;
-    }
-    .multi-company-container .tab-button.active {
-      background-color: #007AFF;
-    }
-    /* Remove Company Button (red "×") */
-    .remove-company-btn {
-      position: absolute;
-      top: 2px;
-      right: 2px;
-      background: none;
-      border: none;
-      color: red;
-      font-weight: bold;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .multi-company-container .company-container {
-      display: none;
-      flex-direction: column;
-      gap: 20px;
-      border-top: 1px solid #444;
-      padding-top: 15px;
-    }
-    .multi-company-container .company-container.active {
-      display: flex;
-    }
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      .tab-nav button {
-        font-size: 14px;
-      }
-    }
-  </style>
-  <!-- Load Google Maps JavaScript API with Places Library using your API key -->
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initMap"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Management Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Maps Places API script with your key -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXdjRQZJd9ySH5mxql4tlXCEVpDH9GGbI&libraries=places&callback=initAutocomplete"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .file-input-button, .view-button { cursor: pointer; }
+        .review-item { transition: all 0.3s ease-in-out; }
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; transform: translateY(20px); }
+            10%, 90% { opacity: 1; transform: translateY(0); }
+        }
+        .notification-toast { animation: fadeInOut 4s ease-in-out forwards; }
+        button:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pac-container { background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.5rem; color: #d1d5db; z-index: 10000 !important; }
+        .pac-item { padding: 0.75rem; cursor: pointer; border-top: 1px solid #374151; }
+        .pac-item:first-child { border-top: none; }
+        .pac-item:hover { background-color: #374151; }
+        .pac-item-query { font-weight: 500; color: #f9fafb; }
+        .hidden { display: none; }
+    </style>
 </head>
-<body>
-  <div class="app-container">
-    <!-- Main Tab Navigation -->
-    <div class="tab-nav">
-      <button id="tab-btn-review" class="active" onclick="openMainTab('review')">Review Manager</button>
-      <button id="tab-btn-prompt" onclick="openMainTab('prompt')">Prompt Generator</button>
-      <button id="tab-btn-place" onclick="openMainTab('place')">Place ID Finder</button>
-      <button id="tab-btn-multi" onclick="openMainTab('multi')">Multi-Company Manager</button>
-    </div>
+<body class="text-gray-200">
 
-    <!-- Review Manager (Single Company) Tab -->
-    <div id="review" class="tab-content active">
-      <h1>Review Manager</h1>
-      <div class="actions-container">
-        <button class="action-btn" onclick="generateSingleReview()">Generate</button>
-        <button class="action-btn" onclick="downloadSingleJSON()">Download JSON</button>
-        <input type="file" id="single-file-input" accept=".json" onchange="loadSingleFile(event)" />
-      </div>
-      <div class="input-container">
-        <textarea id="single-reviews-input" placeholder="Enter reviews here... (Separate each review by an empty line)"></textarea>
-        <input type="text" id="single-review-link" placeholder="Enter review link..." />
-      </div>
-      <div class="output-container" id="single-output-container"></div>
-      <div class="stats-container" id="single-stats-container">
-        Total Reviews: 0 | Done Reviews: 0
-      </div>
-    </div>
+    <div id="app" class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
-    <!-- Prompt Generator Tab -->
-    <div id="prompt" class="tab-content">
-      <h1>ChatGPT Prompt Generator</h1>
-      <div class="prompt-generator">
-        <label for="prompt-input">Optional: Enter additional points (leave blank to use default):</label>
-        <textarea id="prompt-input" placeholder="Enter extra details here..."></textarea>
-        <button class="action-btn" onclick="generatePrompt()">Generate Prompt</button>
-        <label for="prompt-output">Generated Prompt (copy and paste below):</label>
-        <div id="prompt-output" class="output-area" contenteditable="false"></div>
-        <button class="action-btn" onclick="copyPrompt()">Copy Prompt</button>
-      </div>
-    </div>
-
-    <!-- Place ID Finder Tab -->
-    <div id="place" class="tab-content">
-      <h1>Place ID Finder</h1>
-      <div class="place-finder">
-        <!-- Single Search Field above the map -->
-        <div class="search-container">
-          <label for="pac-input">Search for your company:</label>
-          <input type="text" id="pac-input" placeholder="Enter a company name" />
+        <!-- Initial View: Choose Portal -->
+        <div id="initial-view">
+            <header class="text-center mb-12">
+                <h1 class="text-4xl sm:text-5xl font-bold text-white">Review Management Portal</h1>
+                <p class="text-gray-400 mt-2">Please select your portal to continue.</p>
+            </header>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div id="client-portal-btn" class="view-button text-center p-8 bg-gray-800 rounded-xl border border-gray-700 hover:border-blue-500 hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-1">
+                    <h2 class="text-3xl font-bold text-blue-400">Client Area</h2>
+                    <p class="mt-2 text-gray-400">Submit new reviews for a business.</p>
+                </div>
+                <div id="admin-portal-btn" class="view-button text-center p-8 bg-gray-800 rounded-xl border border-gray-700 hover:border-indigo-500 hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-1">
+                    <h2 class="text-3xl font-bold text-indigo-400">Admin Dashboard</h2>
+                    <p class="mt-2 text-gray-400">Manage companies and submitted reviews.</p>
+                </div>
+            </div>
         </div>
-        <div id="map"></div>
-        <label>Generated Review Link:</label>
-        <div id="place-output" class="output-area"></div>
-        <button class="action-btn" onclick="copyPlaceLink()">Copy Link</button>
-        <!-- Google Sheet Row Generator Section -->
-        <hr style="border: 1px solid #444; margin: 12px 0;">
-        <h2>Google Sheet Row Generator</h2>
-        <label for="quantity-today">Quantity for Today:</label>
-        <input type="text" id="quantity-today" placeholder="Enter Quantity for Today" />
-        <label for="total-done">Total Done:</label>
-        <input type="text" id="total-done" placeholder="Enter Total Done Reviews" />
-        <label for="reviews-ordered">Reviews Ordered:</label>
-        <input type="text" id="reviews-ordered" placeholder="Enter Reviews Ordered" />
-        <button class="action-btn" onclick="generateSheetRow()">Generate Sheet Row</button>
-        <div id="sheet-output" class="output-area" style="margin-top: 12px;"></div>
-        <button class="action-btn" onclick="copySheetRow()">Copy Sheet Row</button>
-      </div>
+
+        <!-- Client View -->
+        <div id="client-view" class="hidden">
+            <!-- Client view content will be rendered here by JS -->
+        </div>
+
+        <!-- Admin View -->
+        <div id="admin-view" class="hidden">
+             <!-- Admin view content will be rendered here by JS -->
+        </div>
     </div>
-
-    <!-- Multi-Company Manager Tab -->
-    <div id="multi" class="tab-content">
-      <div class="multi-company-container">
-        <h2>Multi-Company Manager (w/ Local Storage)</h2>
-        <!-- Company Tab Buttons -->
-        <div class="tabs-container" id="multi-tabs-container">
-          <!-- Buttons will be added dynamically -->
-        </div>
-        <div class="actions-container">
-          <button class="action-btn" onclick="addCompany()">+ Add Company Tab</button>
-          <button class="action-btn" onclick="clearLocalStorage()">Clear All Data</button>
-        </div>
-        <!-- Company Containers -->
-        <div id="companies-wrapper">
-          <!-- Company containers will be added dynamically here -->
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    /**************** GLOBAL VARIABLES ****************/
-    // For Place ID Finder – store selected company name and review count.
-    let selectedCompanyName = "";
-    let selectedStartingCount = 0;
-
-    /**************** MAIN TABS ****************/
-    function openMainTab(tabName) {
-      const tabs = document.querySelectorAll('.tab-content');
-      const tabButtons = document.querySelectorAll('.tab-nav button');
-      tabs.forEach(tab => tab.classList.remove('active'));
-      tabButtons.forEach(btn => btn.classList.remove('active'));
-      document.getElementById(tabName).classList.add('active');
-      document.getElementById("tab-btn-" + tabName).classList.add('active');
-    }
-
-    /**************** SINGLE COMPANY REVIEW MANAGER ****************/
-    function generateSingleReview() {
-      let reviewsInput = document.getElementById('single-reviews-input').value;
-      const reviewLink = document.getElementById('single-review-link').value.trim();
-      const outputContainer = document.getElementById('single-output-container');
-      outputContainer.innerHTML = '';
-
-      // Replace double quotes with backticks
-      reviewsInput = reviewsInput.replace(/["]/g, '`');
-      const reviewsArray = reviewsInput.split(/\n\s*\n/).map(r => r.trim()).filter(r => r !== "");
-
-      reviewsArray.forEach((review, index) => {
-        const outputDiv = document.createElement('div');
-        outputDiv.className = 'output';
-        outputDiv.id = `single-output-${index}`;
-
-        const linkElement = document.createElement('p');
-        if (reviewLink) {
-          linkElement.innerHTML = `Click: <a href="${reviewLink}" target="_blank">${reviewLink}</a>`;
-        } else {
-          linkElement.textContent = 'No review link provided';
-        }
-        outputDiv.appendChild(linkElement);
-
-        const reviewElement = document.createElement('p');
-        reviewElement.textContent = `\`${review}\``;
-        outputDiv.appendChild(reviewElement);
-
-        const copyButton = document.createElement('button');
-        copyButton.className = 'copy-btn';
-        copyButton.textContent = 'Copy';
-        copyButton.onclick = () => {
-          copyToClipboard(`Click: ${reviewLink}\n\n\`${review}\``);
-          markAsDone(outputDiv);
-          updateSingleStats();
-        };
-        outputDiv.appendChild(copyButton);
-
-        outputContainer.appendChild(outputDiv);
-      });
-
-      updateSingleStats();
-    }
-
-    function copyToClipboard(text) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-          if (navigator.vibrate) {
-            navigator.vibrate(100);
-          }
-        }).catch(err => {
-          fallbackCopy(text);
-        });
-      } else {
-        fallbackCopy(text);
-      }
-    }
-
-    function fallbackCopy(text) {
-      const tempTextArea = document.createElement('textarea');
-      tempTextArea.value = text;
-      tempTextArea.style.position = 'fixed';
-      tempTextArea.style.top = '-9999px';
-      document.body.appendChild(tempTextArea);
-      tempTextArea.select();
-      try {
-        document.execCommand('copy');
-      } catch (err) {
-        console.error('Fallback copy failed', err);
-      }
-      document.body.removeChild(tempTextArea);
-      if (navigator.vibrate) {
-        navigator.vibrate(100);
-      }
-    }
-
-    function markAsDone(outputDiv) {
-      outputDiv.classList.add('done');
-    }
-
-    function updateSingleStats() {
-      const total = document.getElementsByClassName('output').length;
-      const done = document.getElementsByClassName('done').length;
-      document.getElementById('single-stats-container').textContent = `Total Reviews: ${total} | Done Reviews: ${done}`;
-    }
-
-    // Prompt for file name before download.
-    function downloadSingleJSON() {
-      const outputs = document.querySelectorAll('#single-output-container .output');
-      const reviewData = Array.from(outputs).map(output => {
-        return {
-          reviewText: output.querySelector('p:nth-child(2)').textContent,
-          reviewLink: output.querySelector('a') ? output.querySelector('a').href : '',
-          status: output.classList.contains('done') ? 'done' : 'undone'
-        };
-      });
-      const data = JSON.stringify(reviewData, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      let fileName = prompt("Enter file name to save (with .json extension):", "reviews.json");
-      if (!fileName) {
-        fileName = "reviews.json";
-      }
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function loadSingleFile(event) {
-      const file = event.target.files[0];
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const jsonContent = JSON.parse(e.target.result);
-          const outputContainer = document.getElementById('single-output-container');
-          outputContainer.innerHTML = '';
-          jsonContent.forEach((item, index) => {
-            const outputDiv = document.createElement('div');
-            outputDiv.className = 'output';
-            outputDiv.id = `single-output-${index}`;
-            if (item.status === 'done') outputDiv.classList.add('done');
-            const linkElement = document.createElement('p');
-            if (item.reviewLink) {
-              linkElement.innerHTML = `Click: <a href="${item.reviewLink}" target="_blank">${item.reviewLink}</a>`;
-            } else {
-              linkElement.textContent = 'No review link provided';
-            }
-            outputDiv.appendChild(linkElement);
-            const reviewElement = document.createElement('p');
-            reviewElement.textContent = item.reviewText;
-            outputDiv.appendChild(reviewElement);
-            const copyButton = document.createElement('button');
-            copyButton.className = 'copy-btn';
-            copyButton.textContent = 'Copy';
-            copyButton.onclick = () => {
-              copyToClipboard(`Click: ${item.reviewLink}\n\n${item.reviewText}`);
-              markAsDone(outputDiv);
-              updateSingleStats();
-            };
-            outputDiv.appendChild(copyButton);
-            outputContainer.appendChild(outputDiv);
-          });
-          if (jsonContent.length > 0 && jsonContent[0].reviewLink) {
-            document.getElementById('single-review-link').value = jsonContent[0].reviewLink;
-          }
-          updateSingleStats();
-        } catch (error) {
-          alert('Error parsing JSON file.');
-        }
-      };
-      if (file) reader.readAsText(file);
-    }
-
-    /**************** PROMPT GENERATOR ****************/
-    function generatePrompt() {
-      const extraInput = document.getElementById('prompt-input').value.trim();
-      const points = extraInput ? extraInput : "the points above";
-      const promptText = `${points} 
-
-based on the points above Craft 50 positive detailed reviews based on the above context and strictly follow the requirements outlined below
-Requirements:
-- Company Name Usage: Do not include the company name in every review. Only insert it into some of the reviews (e.g., Reviews 1, 3, 5, 7, and 10). The rest should use general terms like “the team,” “the service,” “they,” or refer to the experience without naming the company. This prevents repetition and makes the reviews sound more natural.
-
-Sentence Structure Variety: Avoid repeating the same sentence pattern across all reviews. Do not follow a fixed format like:
-“John is the best! The service was amazing. Highly recommended!”
-Instead, vary the tone, style, and flow:
-
-Start some reviews with a personal story
-
-Use different emotional tones (excited, grateful, surprised, relaxed, etc.)
-
-Mix short and long sentences
-
-Vary the structure: some can be casual, others formal or descriptive
-
-Realism and Authenticity: Make it sound like 10 different real people wrote the reviews. Include specific, realistic details, and even small flaws or neutral remarks followed by praise in one or two reviews (e.g., “Had to wait 5 minutes, but it was worth it”), to improve credibility.
-
-Randomize the Review Lengths: Do not make all reviews long, all short, or follow a predictable pattern like alternating between long and short. Instead, randomize the length of each review naturally.
-
-Some reviews should be short and snappy (e.g., 5–10 words: “Fast service. Super satisfied!” or “Will return. Great experience.”)
-
-Others should be medium length (2–4 sentences), and a few should be long and detailed (4–8+ sentences with specific details and storytelling).
-
-Avoid Patterns: The order of lengths should feel random, like:
-Long, short, short, long, medium, short, long, short, long, medium
-This prevents detection when reviews are posted in sequence and makes the overall output more human-like.
-
-Vocabulary Variety – Prioritize Simplicity, Mix in Depth:
-Most reviews should use simple, everyday English—casual tone, easy vocabulary, and natural phrasing that resembles how an average person would write a quick review. Avoid sounding too polished or robotic.
-However, include 1 or 2 reviews that use slightly more advanced vocabulary or articulate phrasing, as if written by a well-spoken or expressive customer. This adds realism and makes the full set of reviews sound more diverse and believable.
-Examples:
-
-Simple: “Fast service, friendly staff. Will come back.”
-
-Slightly refined: “From start to finish, the entire process was smooth, efficient, and exceeded my expectations.”
-
-Avoid Overly Promotional or Dramatic Tone:
-The reviews should sound natural and conversational, like something a real customer would post—not exaggerated or overly enthusiastic. Avoid phrases that sound scripted, fake, or too good to be true (e.g., “Absolutely flawless!”, “10/10 best ever!”, “I’m speechless!”).
-Instead, use subtle praise, realistic appreciation, and moderate expressions. Some reviews can include small imperfections or minor observations (e.g., “Had to wait a bit, but it was worth it”) to sound more believable.
-The goal is to make the reviews feel like genuine customer reflections, not advertising.
-
-Vary Writing Voice Slightly:
-Consider introducing slight differences in writing style—some reviews can be casual and relaxed (“super chill vibe, loved it”), while others are more formal or proper. One or two may include emojis or casual lingo to mimic the variety of people on Google. You can even include 1 broken-English style review if the brand serves a wide customer base.
-
-Randomized Capitalization Styles:
-Vary capitalization across different reviews to reflect real-world typing habits. Some reviews should follow proper sentence case (e.g., “The service was great.”), while others should reflect auto-capitalization being off or inconsistent (e.g., “great experience. will definitely return.”). This variation should be randomly spread out, not patterned. Do not apply improper casing to all or most reviews—only a few should use it inconsistently to mimic natural human typing.
-
-Low-Frequency Emoji Usage:
-Include emojis in only 1 out of every 10 reviews (or fewer). The emoji should be context-appropriate (e.g., 😊, 👍, 🙌), and placed naturally at the end or mid-sentence. Avoid overusing emojis or putting them in every review, as that reduces authenticity. Most real users don’t use emojis in Google reviews—only the occasional expressive person does.
-
-Avoid Non-Standard Punctuation:
-Do not use unusual punctuation marks like colons (:), semicolons (;), dashes (-) or em dashes (—) within reviews. Real reviewers rarely take the time to format their writing this precisely. Stick to simple, natural punctuation: periods (.), commas (,), exclamation points (!) used sparingly, and question marks (?) only when contextually necessary.
-
-Include Casual Time References in Some Reviews:
-In 3 reviews, include a soft time reference like “visited last week,” “came here yesterday,” “this morning was my first time,” or “been here twice this month.” This adds a sense of real-time behavior and improves believability.
-
-Vary Reviewer Contexts Subtly:
-In a few reviews, mention small contextual clues that hint at different demographics or scenarios (e.g., “great spot for a quick lunch break,” “brought my kids and they loved it,” “perfect after a long day at work”). This helps make the pool of reviews feel like they came from diverse customers.
-
-Use Specific, Natural Details Without Copying Full Names:
-When known, include realistic and specific references to services, products, staff, or actions (e.g., “the sambal chicken was crispy,” “Jane at the front desk was super helpful,” “checkout was quick and smooth”). These details add realism and depth to the review.
-However, do not quote full item names exactly as listed in menus, brochures, or catalogs. Simplify them into natural, conversational descriptions, as a real customer would say casually.
-For example:
-
-❌ “Three Piece Fried Chicken with Sambal Chilli and Coke with Mayo Sauce – Best Seller”
-✅ “Tried the sambal chicken combo it is delicious.”
-
-❌ “Premium Platinum Lock Installation with NFC Key System”
-✅ “They installed an NFC lock for me super smooth process.”
-
-Avoid Repeating the Same Business or Item Names Across Consecutive Reviews:
-Do not repeat the exact business name, product name, food name, or service name in multiple reviews back-to-back. Spread them out randomly across the full set of reviews.
-
-Only include the business name in a few randomly selected reviews, not in all. The rest should refer to the business with general terms like “this place,” “the team,” “the restaurant,” or skip naming entirely.
-
-Similarly, if referencing food or product names (e.g., “salted egg pork rib”, “crispy chicken mid wings”), do not repeat the same item across reviews unless it makes natural sense (e.g., being a top-seller). Even then, ensure the phrasing is varied and mention is spaced out—not clustered together.
-
-✔️ Examples:
-
-“Had dinner at Golden Spoon Seafood last night…”
-
-“This spot serves the crispiest cereal prawns.”
-
-“We tried the pork rib dish—real comfort food.”
-
-“Kids loved the fried stuff, portions were generous.”
-
-This spacing makes the reviews feel like they were written by different people on different days, and prevents artificial repetition.
-
-trict Limit on Business Name Mentions (Per 5 Reviews):
-To maintain realism and avoid obvious patterns, only mention the business or brand name once for every 5 reviews. The rest should use general references like “this place,” “the restaurant,” “the team,” or no name at all.
-Within each 5-review block, randomize which review contains the business name—do not always use it in the 1st or 5th review.
-This means:
-
-Reviews 1–5 → only one should contain the brand name (randomly selected)
-
-Reviews 6–10 → again, only one
-
-Reviews 11–15 → same rule applies and so on for the rest of the reviews
-
-This rule applies regardless of total review count, ensuring name usage is well-distributed and never repetitive.
-
-Formatting the reviews, do not number the reviews. Separate each review with a new line. 
-
-Example format:
-
-content 1 
-
-content 2`;
-      document.getElementById('prompt-output').textContent = promptText;
-    }
-
-    function copyPrompt() {
-      const promptText = document.getElementById('prompt-output').textContent;
-      copyToClipboard(promptText);
-    }
-
-    /**************** PLACE ID FINDER ****************/
-    // Single initMap function for the Place ID Finder.
-    function initMap() {
-      const map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: -33.8688, lng: 151.2195 },
-        zoom: 13,
-      });
-      const input = document.getElementById("pac-input");
-      // Request additional field "user_ratings_total" to get the starting review count.
-      const autocomplete = new google.maps.places.Autocomplete(input, {
-        fields: ["place_id", "geometry", "formatted_address", "name", "user_ratings_total"],
-      });
-      autocomplete.bindTo("bounds", map);
-      // Place the search input above the map (inside .search-container)
-      map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
-      const marker = new google.maps.Marker({ map: map });
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (!place.geometry || !place.geometry.location) return;
-        if (place.geometry.viewport) {
-          map.fitBounds(place.geometry.viewport);
-        } else {
-          map.setCenter(place.geometry.location);
-          map.setZoom(17);
-        }
-        marker.setPosition(place.geometry.location);
-        marker.setVisible(true);
-        // Store the company name and starting review count for later use.
-        selectedCompanyName = place.name || "";
-        selectedStartingCount = place.user_ratings_total || 0;
-        const reviewLink = "https://search.google.com/local/writereview?placeid=" + place.place_id;
-        document.getElementById("place-output").textContent = reviewLink;
-      });
-    }
-
-    function copyPlaceLink() {
-      const placeLink = document.getElementById("place-output").textContent;
-      if (placeLink) {
-        copyToClipboard(placeLink);
-      }
-    }
-
-    /**************** GOOGLE SHEET ROW GENERATOR ****************/
-    function generateSheetRow() {
-      if (!selectedCompanyName) {
-        alert("Please search and select a company first.");
-        return;
-      }
-      // Get input values for the sheet row.
-      const quantityToday = document.getElementById('quantity-today').value.trim();
-      const totalDone = document.getElementById('total-done').value.trim();
-      const reviewsOrdered = document.getElementById('reviews-ordered').value.trim();
-
-      // Convert to numbers.
-      const qToday = parseInt(quantityToday, 10) || 0;
-      const tDone = parseInt(totalDone, 10) || 0;
-      const rOrdered = parseInt(reviewsOrdered, 10) || 0;
-
-      // Calculate ending count and reviews left (row d - row c).
-      const endingCount = selectedStartingCount + rOrdered;
-      const reviewsLeft = rOrdered - tDone;
-      // Construct the row exactly as: 
-      // Company Name	Today Qty	Total Done	Reviews Ordered	Starting Count	Ending Count		(Reviews Ordered - Total Done)
-      const sheetRow = `${selectedCompanyName}\t${qToday}\t${tDone}\t${rOrdered}\t${selectedStartingCount}\t${endingCount}\t\t${reviewsLeft}`;
-      document.getElementById('sheet-output').textContent = sheetRow;
-    }
-
-    function copySheetRow() {
-      const sheetRow = document.getElementById('sheet-output').textContent;
-      if (sheetRow) {
-        copyToClipboard(sheetRow);
-      }
-    }
-
-    /**************** MULTI-COMPANY MANAGER ****************/
-    let companiesData = [];
-    let currentCompanyIndex = -1;
-
-    function saveToLocalStorage() {
-      try {
-        localStorage.setItem('companiesData', JSON.stringify(companiesData));
-      } catch (err) {
-        console.error('Error saving to localStorage:', err);
-      }
-    }
-
-    function loadFromLocalStorage() {
-      const dataString = localStorage.getItem('companiesData');
-      if (!dataString) return;
-      try {
-        const parsed = JSON.parse(dataString);
-        if (Array.isArray(parsed)) {
-          companiesData = parsed;
-          companiesData.forEach((company, index) => {
-            createMultiCompanyTabButton(index, company.companyName);
-            createMultiCompanyContainer(index);
-            renderMultiCompanyOutputs(index);
-          });
-          if (companiesData.length > 0) selectMultiCompany(0);
-        }
-      } catch (err) {
-        console.error('Error parsing localStorage data:', err);
-      }
-    }
-
-    function clearLocalStorage() {
-      localStorage.removeItem('companiesData');
-      companiesData = [];
-      currentCompanyIndex = -1;
-      document.getElementById('multi-tabs-container').innerHTML = '';
-      document.getElementById('companies-wrapper').innerHTML = '';
-      alert("Local data cleared.");
-    }
-
-    window.addEventListener('beforeunload', () => {
-      saveToLocalStorage();
-    });
-
-    function selectMultiCompany(index) {
-      if (currentCompanyIndex >= 0 && companiesData[currentCompanyIndex]) {
-        const oldTab = document.getElementById(`multi-tab-btn-${currentCompanyIndex}`);
-        const oldContainer = document.getElementById(`company-container-${currentCompanyIndex}`);
-        if (oldTab) oldTab.classList.remove('active');
-        if (oldContainer) oldContainer.classList.remove('active');
-      }
-      currentCompanyIndex = index;
-      const newTab = document.getElementById(`multi-tab-btn-${index}`);
-      const newContainer = document.getElementById(`company-container-${index}`);
-      if (newTab) newTab.classList.add('active');
-      if (newContainer) newContainer.classList.add('active');
-      updateMultiStats();
-    }
-
-    function createMultiCompanyTabButton(index, companyName) {
-      const multiTabsContainer = document.getElementById('multi-tabs-container');
-      const tabButton = document.createElement('button');
-      tabButton.className = 'tab-button';
-      tabButton.id = `multi-tab-btn-${index}`;
-      // Add company name and a remove button
-      tabButton.innerHTML = companyName + ' <span class="remove-company-btn" onclick="removeCompany(' + index + '); event.stopPropagation();">×</span>';
-      tabButton.onclick = () => selectMultiCompany(index);
-      multiTabsContainer.appendChild(tabButton);
-    }
-
-    function createMultiCompanyContainer(index) {
-      const companiesWrapper = document.getElementById('companies-wrapper');
-      const companyContainer = document.createElement('div');
-      companyContainer.className = 'company-container';
-      companyContainer.id = `company-container-${index}`;
-      companyContainer.innerHTML = `
-         <div class="actions-container">
-           <button class="action-btn" onclick="copyLatestUndoneReview(${index})">Copy Latest Undone</button>
-           <button class="action-btn" onclick="downloadJSON(${index})">Download JSON</button>
-           <input type="file" id="file-input-${index}" accept=".json" multiple onchange="loadFiles(event, ${index})" />
-         </div>
-         <div class="output-container" id="output-container-${index}"></div>
-         <div class="stats-container" id="stats-container-${index}">
-           Total Reviews: 0 | Done Reviews: 0
-         </div>
-       `;
-      companiesWrapper.appendChild(companyContainer);
-      companiesData[index].containerEl = companyContainer;
-    }
-
-    function renderMultiCompanyOutputs(index) {
-      const outputContainer = document.getElementById(`output-container-${index}`);
-      outputContainer.innerHTML = '';
-      companiesData[index].reviews.forEach((review, reviewIndex) => {
-        const outputDiv = createMultiReviewOutput(review, reviewIndex, index);
-        outputContainer.appendChild(outputDiv);
-      });
-    }
-
-    function createMultiReviewOutput(review, reviewIndex, companyIndex) {
-      const outputDiv = document.createElement('div');
-      outputDiv.className = 'output';
-      outputDiv.id = `output-${companyIndex}-${reviewIndex}`;
-      if (review.status === 'done') outputDiv.classList.add('done');
-      const linkElement = document.createElement('p');
-      linkElement.innerHTML = `Click: <a href="${review.link}" target="_blank">${review.link}</a>`;
-      outputDiv.appendChild(linkElement);
-      const reviewElement = document.createElement('p');
-      reviewElement.textContent = review.text;
-      outputDiv.appendChild(reviewElement);
-      const copyButton = document.createElement('button');
-      copyButton.className = 'copy-btn';
-      copyButton.textContent = 'Copy';
-      copyButton.onclick = () => {
-        copyToClipboard(`Click: ${review.link}\n\n${review.text}`);
-        markAsDone(outputDiv);
-        review.status = 'done';
-        updateMultiStats();
-        saveToLocalStorage();
-      };
-      outputDiv.appendChild(copyButton);
-      return outputDiv;
-    }
-
-    function updateMultiStats() {
-      if (currentCompanyIndex < 0) return;
-      const company = companiesData[currentCompanyIndex];
-      const total = company.reviews.length;
-      const done = company.reviews.filter(r => r.status === 'done').length;
-      document.getElementById(`stats-container-${currentCompanyIndex}`).textContent = `Total Reviews: ${total} | Done Reviews: ${done}`;
-    }
-
-    function copyLatestUndoneReview(companyIndex) {
-      const company = companiesData[companyIndex];
-      const undoneReview = company.reviews.find(r => r.status !== 'done');
-      if (undoneReview) {
-        copyToClipboard(`Click: ${undoneReview.link}\n\n${undoneReview.text}`);
-        undoneReview.status = 'done';
-        renderMultiCompanyOutputs(companyIndex);
-        updateMultiStats();
-        saveToLocalStorage();
-      } else {
-        alert('No undone reviews available for this company!');
-      }
-    }
-
-    function downloadJSON(companyIndex) {
-      const company = companiesData[companyIndex];
-      const reviewData = company.reviews.map(item => ({
-        reviewText: item.text,
-        reviewLink: item.link,
-        status: item.status
-      }));
-      const data = JSON.stringify(reviewData, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${company.companyName.replace(/\s+/g, '_')}_reviews.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function loadFiles(event, companyIndex) {
-      const files = event.target.files;
-      if (!files.length) return;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          try {
-            const jsonContent = JSON.parse(e.target.result);
-            jsonContent.forEach(item => {
-              const newReview = {
-                text: item.reviewText || "",
-                link: item.reviewLink || "",
-                status: item.status === 'done' ? 'done' : 'undone'
-              };
-              companiesData[companyIndex].reviews.push(newReview);
+    
+    <!-- MODALS & NOTIFICATIONS -->
+    <div id="login-modal-container"></div>
+    <div id="generic-modal-container"></div>
+    <div id="notification" class="hidden fixed bottom-5 right-5 bg-gray-800 border border-gray-700 text-white py-3 px-5 rounded-lg shadow-xl z-[10001]"></div>
+    
+    <script>
+        // Global function for Google Maps callback
+        let autocomplete;
+        function initAutocomplete() {
+            const input = document.getElementById('client-link-input');
+            if(!input || input.dataset.acAttached) return; 
+            
+            autocomplete = new google.maps.places.Autocomplete(input, {
+                fields: ["place_id", "name", "url"],
+                types: ["establishment"]
             });
-            renderMultiCompanyOutputs(companyIndex);
-            updateMultiStats();
-            saveToLocalStorage();
-          } catch (err) {
-            alert("Invalid JSON file!");
-          }
-        };
-        reader.readAsText(file);
-      }
-    }
+            input.dataset.acAttached = 'true';
 
-    function addCompany() {
-      let companyName = prompt("Enter the Company Name:", `Company ${companiesData.length + 1}`);
-      if (!companyName) companyName = `Company ${companiesData.length + 1}`;
-      const newIndex = companiesData.length;
-      const newCompany = {
-        companyName: companyName,
-        reviews: [],
-        containerEl: null
-      };
-      companiesData.push(newCompany);
-      createMultiCompanyTabButton(newIndex, companyName);
-      createMultiCompanyContainer(newIndex);
-      selectMultiCompany(newIndex);
-      saveToLocalStorage();
-    }
-
-    function removeCompany(index) {
-      if (confirm("Are you sure you want to remove this company?")) {
-        companiesData.splice(index, 1);
-        // Rebuild Multi-Company UI
-        const multiTabsContainer = document.getElementById('multi-tabs-container');
-        const companiesWrapper = document.getElementById('companies-wrapper');
-        multiTabsContainer.innerHTML = '';
-        companiesWrapper.innerHTML = '';
-        companiesData.forEach((company, i) => {
-          createMultiCompanyTabButton(i, company.companyName);
-          createMultiCompanyContainer(i);
-          renderMultiCompanyOutputs(i);
-        });
-        if (companiesData.length > 0) {
-          selectMultiCompany(0);
-        } else {
-          currentCompanyIndex = -1;
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+                if (place && place.place_id) {
+                    const reviewLink = `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+                    document.dispatchEvent(new CustomEvent('placeSelected', { detail: { link: reviewLink } }));
+                }
+            });
         }
-        saveToLocalStorage();
-      }
-    }
 
-    /**************** LOAD FROM LOCAL STORAGE ****************/
-    window.onload = () => {
-      loadFromLocalStorage();
-    };
-  </script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = {
+                // --- STATE ---
+                state: {
+                    currentView: 'initial',
+                    isClientLoggedIn: false,
+                    isAdminLoggedIn: false,
+                    data: { companies: [] },
+                    activeCompanyId: null,
+                    clientState: {
+                        link: '',
+                        reviews: []
+                    }
+                },
+
+                // --- DOM ELEMENTS ---
+                elements: {
+                    app: document.getElementById('app'),
+                    initialView: document.getElementById('initial-view'),
+                    clientView: document.getElementById('client-view'),
+                    adminView: document.getElementById('admin-view'),
+                    loginModalContainer: document.getElementById('login-modal-container'),
+                    genericModalContainer: document.getElementById('generic-modal-container'),
+                    notification: document.getElementById('notification'),
+                },
+
+                // --- INITIALIZATION ---
+                init() {
+                    this.loadData();
+                    this.attachInitialListeners();
+                    this.render();
+                },
+
+                // --- DATA PERSISTENCE ---
+                loadData() {
+                    const savedData = localStorage.getItem('reviewDashboardData');
+                    if (savedData) {
+                        this.state.data = JSON.parse(savedData);
+                        if (!this.state.data.companies) this.state.data.companies = [];
+                    }
+                },
+                saveData() {
+                    localStorage.setItem('reviewDashboardData', JSON.stringify(this.state.data));
+                    this.showNotification("Admin data saved!");
+                },
+
+                // --- VIEW MANAGEMENT ---
+                switchView(view) {
+                    this.state.currentView = view;
+                    if (view === 'client' && !this.state.isClientLoggedIn) {
+                        this.showLoginModal('client');
+                        return;
+                    }
+                    if (view === 'admin' && !this.state.isAdminLoggedIn) {
+                        this.showLoginModal('admin');
+                        return;
+                    }
+
+                    if (view === 'client') {
+                        this.state.clientState = { link: '', reviews: [] };
+                    }
+                    
+                    if(view === 'initial') {
+                        this.state.isClientLoggedIn = false;
+                        this.state.isAdminLoggedIn = false;
+                    }
+                    this.render();
+                },
+
+                // --- RENDERING ---
+                render() {
+                    const { initialView, clientView, adminView } = this.elements;
+                    initialView.classList.toggle('hidden', this.state.currentView !== 'initial');
+                    clientView.classList.toggle('hidden', this.state.currentView !== 'client');
+                    adminView.classList.toggle('hidden', this.state.currentView !== 'admin');
+
+                    if (this.state.currentView === 'client') this.renderClientView();
+                    if (this.state.currentView === 'admin') this.renderAdminView();
+                },
+                
+                // --- CLIENT VIEW ---
+                renderClientView() {
+                    const { link, reviews } = this.state.clientState;
+                    const isLinkSet = !!link;
+                    this.elements.clientView.innerHTML = `
+                        <div class="flex justify-between items-center mb-8">
+                            <button class="back-to-initial-btn text-gray-400 hover:text-white">&larr; Logout & Return to Portal Selection</button>
+                            <button id="how-to-use-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">? How to Use</button>
+                        </div>
+                        <header class="mb-8">
+                            <h1 class="text-3xl sm:text-4xl font-bold text-white">Client Review Submission</h1>
+                        </header>
+                        <div id="client-link-section" class="mt-8 p-6 bg-gray-800 border border-gray-700 rounded-xl ${isLinkSet ? 'opacity-70' : ''}">
+                             <h2 class="text-xl font-semibold text-white mb-4">Step 1: Find Business or Paste Link</h2>
+                             <div class="flex flex-col sm:flex-row gap-3">
+                                 <input type="text" id="client-link-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg" placeholder="Search for a business or paste link..." value="${link}" ${isLinkSet ? 'disabled' : ''}>
+                                 <button id="set-client-link-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg" ${isLinkSet ? 'disabled' : ''}>${isLinkSet ? 'Link Set!' : 'Set Manually'}</button>
+                             </div>
+                             <p id="client-link-error" class="text-red-400 mt-2 text-sm hidden">Invalid link.</p>
+                        </div>
+                        
+                        <div id="client-reviews-section" class="mt-8 ${!isLinkSet ? 'hidden' : ''}">
+                             <h2 class="text-xl font-semibold text-white mb-4">Step 2: Add Your Reviews</h2>
+                            <button id="add-client-review-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg mb-6">Add New Review</button>
+                            <div id="client-reviews-container">${this.renderClientReviews()}</div>
+                             <div class="mt-8 pt-6 border-t border-gray-700 text-right">
+                                 <button id="download-client-file-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" ${reviews.length === 0 ? 'disabled' : ''}>Download Submission File</button>
+                             </div>
+                        </div>
+                    `;
+                    if(!isLinkSet) setTimeout(() => window.initAutocomplete && initAutocomplete(), 100);
+                },
+                
+                renderClientReviews() {
+                    const { reviews } = this.state.clientState;
+                    if(reviews.length === 0) return '<p class="text-gray-400 text-center py-4">No reviews added yet. Click "Add New Review" to start.</p>';
+                    return reviews.map((review, index) => `
+                        <div class="review-item bg-gray-800 p-6 rounded-xl mb-6 border border-gray-700">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-2xl font-bold text-blue-400">#${index + 1}</span>
+                                <button data-index="${index}" class="remove-client-review-btn text-gray-500 hover:text-red-500 font-bold text-2xl">&times;</button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="font-semibold text-gray-300 mb-2 block">Review Content</label>
+                                    <textarea data-index="${index}" class="content-input w-full p-3 bg-gray-900 border border-gray-600 rounded-lg h-32 resize-none">${review.text}</textarea>
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-gray-300 mb-2 block cursor-pointer">
+                                        <input type="checkbox" data-index="${index}" class="image-toggle-checkbox mr-2 accent-blue-500" ${review.requiresImage ? 'checked' : ''}>
+                                        Requires Image?
+                                    </label>
+                                    <div class="image-upload-area w-full h-24 bg-gray-900 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center relative ${review.requiresImage ? '' : 'hidden'}">
+                                        <img src="${review.imageDataUrl || ''}" class="image-preview ${review.imageDataUrl ? '' : 'hidden'} w-full h-full object-cover rounded-lg">
+                                        <div class="text-center p-2 image-placeholder ${review.imageDataUrl ? 'hidden' : ''}">
+                                            <p class="text-sm text-gray-500">Click to upload</p>
+                                        </div>
+                                        <input type="file" data-index="${index}" class="image-input absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                },
+                
+                // --- ADMIN VIEW ---
+                renderAdminView() {
+                    this.elements.adminView.innerHTML = `
+                        <div class="flex justify-between items-center mb-8">
+                            <h1 class="text-3xl sm:text-4xl font-bold text-white">Admin Dashboard</h1>
+                            <button class="back-to-initial-btn text-gray-400 hover:text-white">&larr; Logout & Return to Portal Selection</button>
+                        </div>
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 self-start">
+                             <h2 class="text-xl font-semibold text-white mb-4">Manage Companies</h2>
+                             <div class="flex flex-col sm:flex-row gap-4">
+                                 <input type="text" id="new-company-name" class="w-full p-2 bg-gray-900 border border-gray-600 rounded-lg" placeholder="New company name...">
+                                 <button id="add-company-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg whitespace-nowrap">Add Company</button>
+                             </div>
+                        </div>
+                        <main id="admin-main-content" class="mt-8">
+                            ${this.renderAdminMainContent()}
+                        </main>
+                    `;
+                },
+                
+                renderAdminMainContent() {
+                    const companies = this.state.data.companies;
+                    if (companies.length === 0) {
+                        return `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><h3 class="text-xl font-semibold text-white">No Companies Added</h3><p class="text-gray-400 mt-2">Please add a company to begin.</p></div>`;
+                    }
+                    
+                    const company = companies.find(c => c.id === this.state.activeCompanyId);
+
+                    return `
+                        <div class="border-b border-gray-600 mb-6">
+                            <nav class="-mb-px flex gap-4 overflow-x-auto" aria-label="Tabs">
+                                ${companies.map(c => `
+                                    <button data-id="${c.id}" class="company-tab-btn group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${this.state.activeCompanyId === c.id ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}">
+                                        ${c.name}
+                                    </button>
+                                `).join('')}
+                            </nav>
+                        </div>
+                        ${company ? this.renderAdminCompanyDetails(company) : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400 mt-2">Select a company tab to view its details.</p></div>`}
+                    `;
+                },
+                
+                renderAdminCompanyDetails(company) {
+                    const totalReviews = company.reviews?.length || 0;
+                    const doneReviews = company.reviews?.filter(r => r.status === 'done').length || 0;
+                    const progress = totalReviews > 0 ? (doneReviews / totalReviews) * 100 : 0;
+                    const undoneReviews = company.reviews?.filter(r => r.status !== 'done') || [];
+
+                    return `
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8">
+                            <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
+                                <div>
+                                  <h2 class="text-2xl font-bold text-white">${company.name}</h2>
+                                  <a href="${company.reviewLink || '#'}" target="_blank" class="text-sm text-indigo-400 hover:underline break-all">${company.reviewLink || 'No review link set yet.'}</a>
+                                </div>
+                                <div class="flex flex-col gap-3 items-end w-full md:w-auto">
+                                    <div class="flex items-center flex-wrap gap-3 justify-end">
+                                        <button data-id="${company.id}" class="copy-latest-undone-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg" ${undoneReviews.length === 0 ? 'disabled' : ''}>Copy Latest</button>
+                                        <label class="file-input-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                                            Upload File
+                                            <input type="file" data-id="${company.id}" class="upload-admin-file hidden" accept=".json">
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center flex-wrap gap-3 justify-end">
+                                        <button data-id="${company.id}" class="download-admin-file-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Download Data</button>
+                                        <button data-id="${company.id}" class="remove-company-btn bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Delete Company</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Progress Bar -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-base font-medium text-indigo-400">Completion</span>
+                                    <span class="text-sm font-medium text-indigo-400">${doneReviews} / ${totalReviews} (${Math.round(progress)}%)</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${progress}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="admin-reviews-container">
+                            ${company.reviews && company.reviews.length > 0 ? company.reviews.map((review, index) => this.getAdminReviewHtml(company, review, index)).join('') : `<div class="text-center py-16 px-6 bg-gray-800 rounded-lg"><p class="text-gray-400">No reviews submitted for this company yet. Upload a client file.</p></div>`}
+                        </div>
+                    `;
+                },
+
+                getAdminReviewHtml(company, review, index) {
+                    const isDone = review.status === 'done';
+                    return `
+                        <div class="review-item relative bg-gray-800 p-6 rounded-xl mb-6 shadow-lg border ${isDone ? 'border-green-500 opacity-60' : 'border-gray-700'}">
+                            ${isDone ? '<span class="absolute top-3 right-3 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full">DONE</span>' : ''}
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-2xl font-bold text-indigo-400">#${index + 1}</span>
+                            </div>
+                            <div class="grid grid-cols-1 ${review.requiresImage ? 'md:grid-cols-2' : ''} gap-6">
+                                <div class="space-y-2">
+                                    <p class="font-semibold text-gray-300">Review Content:</p>
+                                    <p class="p-3 bg-gray-900 border border-gray-600 rounded-lg whitespace-pre-wrap">${review.text}</p>
+                                </div>
+                                ${review.requiresImage ? `
+                                <div>
+                                    <p class="font-semibold text-gray-300 mb-2">Submitted Image:</p>
+                                    <div class="w-full h-48 bg-gray-900 rounded-lg flex items-center justify-center">
+                                       ${review.imageDataUrl ? `<img src="${review.imageDataUrl}" class="w-full h-full object-contain rounded-lg">` : `<span class="text-gray-500">No image submitted.</span>`}
+                                    </div>
+                                </div>` : ''}
+                            </div>
+                             <div class="mt-6 pt-4 border-t border-gray-700 flex flex-wrap gap-3">
+                                 ${isDone
+                                    ? `<button data-index="${index}" class="undo-review-btn flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Mark as Not Done (Undo)</button>`
+                                    : `<button data-index="${index}" class="copy-btn flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Copy for Telegram</button>`
+                                }
+                                ${review.requiresImage && review.imageDataUrl ? `<button data-index="${index}" class="save-image-btn flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Save Image</button>` : ''}
+                            </div>
+                        </div>`;
+                },
+
+                // --- EVENT LISTENERS ---
+                attachInitialListeners() {
+                    document.getElementById('client-portal-btn').addEventListener('click', () => this.switchView('client'));
+                    document.getElementById('admin-portal-btn').addEventListener('click', () => this.switchView('admin'));
+                    
+                    this.elements.app.addEventListener('click', e => {
+                        if (e.target.closest('.back-to-initial-btn')) {
+                            this.switchView('initial');
+                        }
+                    });
+
+                    // Event Delegation for dynamically added content
+                    this.elements.clientView.addEventListener('click', e => this.handleClientClick(e));
+                    this.elements.clientView.addEventListener('input', e => this.handleClientInput(e));
+                    this.elements.clientView.addEventListener('change', e => this.handleClientChange(e));
+                    document.addEventListener('placeSelected', e => this.handlePlaceSelected(e));
+
+                    this.elements.adminView.addEventListener('click', e => this.handleAdminClick(e));
+                    this.elements.adminView.addEventListener('change', e => this.handleAdminChange(e));
+                },
+
+                // --- EVENT HANDLERS ---
+                handleClientClick(e) {
+                    const target = e.target;
+                    
+                    if (target.id === 'how-to-use-btn') {
+                        this.showInfoModal(
+                            'How to Use the Client Portal',
+                            `<ol class="list-decimal list-inside space-y-3">
+                                <li><strong>Find Business:</strong> Use the search bar to find the business you want to review. Select it from the dropdown. Alternatively, you can paste the full Google Review link directly into the box and click "Set Manually".</li>
+                                <li><strong>Add Reviews:</strong> Click "Add New Review". A new card will appear.</li>
+                                <li><strong>Write Content:</strong> Type your review text into the "Review Content" box.</li>
+                                <li><strong>Add Image (Optional):</strong> If your review requires an image, check the "Requires Image?" box and click the placeholder to upload your picture.</li>
+                                <li><strong>Download File:</strong> Once you've added all your reviews, click "Download Submission File".</li>
+                                <li><strong>Name Your File:</strong> A pop-up will ask you to name your file. Enter a name that helps identify the submission (e.g., 'john_doe_reviews').</li>
+                                <li><strong>Send to Admin:</strong> The file will download to your computer. Please send this downloaded <code>.json</code> file to the administrator via WhatsApp.</li>
+                            </ol>`
+                        );
+                    }
+
+                    if(target.id === 'set-client-link-btn') {
+                        const linkInput = document.getElementById('client-link-input');
+                        if (this.validateLink(linkInput.value)) {
+                            this.state.clientState.link = linkInput.value;
+                            this.render();
+                        } else {
+                           document.getElementById('client-link-error').classList.remove('hidden');
+                        }
+                    }
+                    if (target.id === 'add-client-review-btn') {
+                        this.state.clientState.reviews.unshift({ text: '', requiresImage: false, imageDataUrl: null });
+                        this.render();
+                    }
+                    if (target.closest('.remove-client-review-btn')) {
+                        this.state.clientState.reviews.splice(target.closest('.remove-client-review-btn').dataset.index, 1);
+                        this.render();
+                    }
+                    if (target.id === 'download-client-file-btn') {
+                        this.showPromptModal('Enter a filename', 'e.g., yourname_reviews', (filename) => {
+                            if (!filename) {
+                                this.showNotification('Download cancelled.', 'error');
+                                return;
+                            }
+                            const safeFilename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+                            const dataBlob = new Blob([JSON.stringify(this.state.clientState, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(dataBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${safeFilename}.json`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            this.showNotification('File downloaded! Please send it to us on WhatsApp.');
+                            
+                            // Reset client view
+                            this.state.clientState = { link: '', reviews: [] };
+                            this.render();
+                        });
+                    }
+                },
+                handleClientInput(e) { if(e.target.classList.contains('content-input')) { this.state.clientState.reviews[e.target.dataset.index].text = e.target.value; } },
+                handleClientChange(e) {
+                    const index = e.target.dataset.index;
+                    if(e.target.classList.contains('image-toggle-checkbox')) { this.state.clientState.reviews[index].requiresImage = e.target.checked; this.render(); }
+                    if(e.target.classList.contains('image-input')) {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                                this.state.clientState.reviews[index].imageDataUrl = event.target.result;
+                                this.render();
+                                this.showNotification('Image loaded.');
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    }
+                },
+                handlePlaceSelected(e) { if(this.state.currentView === 'client' && this.validateLink(e.detail.link)) { this.state.clientState.link = e.detail.link; this.render(); } },
+                handleAdminClick(e) {
+                    const target = e.target;
+                    
+                    if(target.id === 'add-company-btn') {
+                        const nameInput = document.getElementById('new-company-name');
+                        if (nameInput.value.trim()) {
+                            const newCompany = { id: `comp_${Date.now()}`, name: nameInput.value.trim(), reviewLink: '', reviews: [] };
+                            this.state.data.companies.push(newCompany);
+                            this.state.activeCompanyId = newCompany.id;
+                            this.saveData();
+                            this.render();
+                            nameInput.value = '';
+                        }
+                    }
+                    if(target.closest('.company-tab-btn')) { this.state.activeCompanyId = target.closest('.company-tab-btn').dataset.id; this.render(); }
+                    if(target.closest('.remove-company-btn')) {
+                        const id = target.closest('.remove-company-btn').dataset.id;
+                        this.showConfirmModal('Delete Company?', 'Are you sure you want to delete this company and all its data? This action cannot be undone.', () => {
+                            this.state.data.companies = this.state.data.companies.filter(c => c.id !== id);
+                            if (this.state.activeCompanyId === id) this.state.activeCompanyId = this.state.data.companies[0]?.id || null;
+                            this.saveData();
+                            this.render();
+                        });
+                    }
+
+                    const company = this.state.data.companies.find(c => c.id === this.state.activeCompanyId);
+                    if(!company) return;
+
+                    const reviewIndex = e.target.closest('[data-index]')?.dataset.index;
+                    if (reviewIndex === undefined && !target.closest('.copy-latest-undone-btn, .download-admin-file-btn')) return;
+
+                    const review = company.reviews[reviewIndex];
+
+                    if (target.closest('.copy-btn')) {
+                        const textToCopy = `Click: ${company.reviewLink}\n\n\`${review.text}\``;
+                        this.copyToClipboard(textToCopy);
+                        review.status = 'done';
+                        this.saveData();
+                        this.render();
+                    }
+                    if (target.closest('.undo-review-btn')) {
+                        review.status = 'undone';
+                        this.saveData();
+                        this.render();
+                        this.showNotification('Review status has been reset.');
+                    }
+                    if (target.closest('.copy-latest-undone-btn')) {
+                        const latestUndone = company.reviews.map((r, i) => ({...r, originalIndex: i})).reverse().find(r => r.status !== 'done');
+                        if (latestUndone) {
+                            const textToCopy = `Click: ${company.reviewLink}\n\n\`${latestUndone.text}\``;
+                            this.copyToClipboard(textToCopy);
+                            company.reviews[latestUndone.originalIndex].status = 'done';
+                            this.saveData();
+                            this.render();
+                        } else {
+                            this.showNotification('No new reviews to copy.');
+                        }
+                    }
+                    if (target.closest('.save-image-btn')) {
+                         if (review.imageDataUrl) {
+                             const a = document.createElement('a');
+                             a.href = review.imageDataUrl;
+                             a.download = `review_image_${company.name}_${parseInt(reviewIndex) + 1}.png`;
+                             document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                         }
+                    }
+                    if (target.closest('.download-admin-file-btn')) {
+                        const companyToDownload = this.state.data.companies.find(c => c.id === target.dataset.id);
+                        const dataBlob = new Blob([JSON.stringify(companyToDownload, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(dataBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `data_${companyToDownload.name.replace(/\s+/g, '_')}.json`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    }
+                },
+                handleAdminChange(e) {
+                    if (e.target.classList.contains('upload-admin-file')) {
+                        const file = e.target.files[0];
+                        const companyId = e.target.dataset.id;
+                        if (file && companyId) {
+                             const reader = new FileReader();
+                             reader.onload = (event) => {
+                                 try {
+                                     const uploaded = JSON.parse(event.target.result);
+                                     if (this.validateLink(uploaded.link) && Array.isArray(uploaded.reviews)) {
+                                         const company = this.state.data.companies.find(c => c.id === companyId);
+                                         if(company) {
+                                             company.reviewLink = uploaded.link;
+                                             const newReviews = uploaded.reviews.map(r => ({...r, status: 'undone'}));
+                                             company.reviews = [...newReviews, ...company.reviews || []];
+                                             this.saveData();
+                                             this.render();
+                                             this.showNotification(`${uploaded.reviews.length} review(s) imported for ${company.name}.`);
+                                         }
+                                     } else { this.showNotification('Invalid file format.', 'error'); }
+                                 } catch (err) { this.showNotification('Error reading file.', 'error'); } 
+                                 finally { e.target.value = ''; }
+                             };
+                             reader.readAsText(file);
+                        }
+                    }
+                },
+
+                // --- UTILITIES & MODALS ---
+                showLoginModal(type) {
+                    const isClient = type === 'client';
+                    const title = isClient ? 'Client Login' : 'Admin Login';
+                    const userLabel = 'Username';
+                    const passLabel = 'Password';
+                    const accentClass = isClient ? 'focus:ring-blue-500' : 'focus:ring-indigo-500';
+                    const buttonClass = isClient ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700';
+
+                    const modalHTML = `
+                        <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]">
+                            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700">
+                                <h2 class="text-2xl font-bold text-white mb-6">${title}</h2>
+                                <form id="login-form">
+                                    <div class="mb-4">
+                                        <label for="username" class="block text-gray-300 mb-2">${userLabel}</label>
+                                        <input type="text" id="username" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg ${accentClass}">
+                                    </div>
+                                    <div class="mb-6">
+                                        <label for="password" class="block text-gray-300 mb-2">${passLabel}</label>
+                                        <input type="password" id="password" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg ${accentClass}">
+                                    </div>
+                                    <p id="login-error" class="text-red-400 text-sm mb-4 hidden">Invalid credentials. Please try again.</p>
+                                    <div class="flex items-center justify-between">
+                                        <button type="button" class="cancel-login-btn text-gray-400 hover:text-white">Cancel</button>
+                                        <button type="submit" class="${buttonClass} text-white font-bold py-2 px-6 rounded-lg">Login</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>`;
+                    this.elements.loginModalContainer.innerHTML = modalHTML;
+                    
+                    const form = this.elements.loginModalContainer.querySelector('#login-form');
+                    const cancelBtn = this.elements.loginModalContainer.querySelector('.cancel-login-btn');
+                    
+                    form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const user = this.elements.loginModalContainer.querySelector('#username').value;
+                        const pass = this.elements.loginModalContainer.querySelector('#password').value;
+                        const correctUser = isClient ? 'client' : 'admin';
+                        const correctPass = isClient ? 'client' : 'admin';
+                        
+                        if (user === correctUser && pass === correctPass) {
+                            if (isClient) this.state.isClientLoggedIn = true;
+                            else this.state.isAdminLoggedIn = true;
+                            this.elements.loginModalContainer.innerHTML = '';
+                            this.switchView(type);
+                        } else {
+                            this.elements.loginModalContainer.querySelector('#login-error').classList.remove('hidden');
+                        }
+                    });
+
+                    cancelBtn.addEventListener('click', () => {
+                        this.elements.loginModalContainer.innerHTML = '';
+                        this.switchView('initial');
+                    });
+                },
+                showConfirmModal(title, message, onConfirm) {
+                    this.elements.genericModalContainer.innerHTML = `
+                        <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]">
+                            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700">
+                                <h2 class="text-2xl font-bold text-white mb-4">${title}</h2>
+                                <p class="text-gray-300 mb-6">${message}</p>
+                                <div class="flex justify-end gap-4">
+                                    <button id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+                                    <button id="modal-confirm" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Confirm</button>
+                                </div>
+                            </div>
+                        </div>`;
+                    document.getElementById('modal-cancel').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                    document.getElementById('modal-confirm').onclick = () => {
+                        onConfirm();
+                        this.elements.genericModalContainer.innerHTML = '';
+                    };
+                },
+                showPromptModal(title, placeholder, onSubmit) {
+                     this.elements.genericModalContainer.innerHTML = `
+                        <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]">
+                            <form id="prompt-form" class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700">
+                                <h2 class="text-2xl font-bold text-white mb-4">${title}</h2>
+                                <input type="text" id="modal-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg mb-6" placeholder="${placeholder}">
+                                <div class="flex justify-end gap-4">
+                                    <button type="button" id="modal-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+                                    <button type="submit" id="modal-submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Submit</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    const input = document.getElementById('modal-input');
+                    input.focus();
+                    document.getElementById('modal-cancel').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                    document.getElementById('prompt-form').onsubmit = (e) => {
+                        e.preventDefault();
+                        onSubmit(input.value);
+                        this.elements.genericModalContainer.innerHTML = '';
+                    };
+                },
+                showInfoModal(title, content) {
+                     this.elements.genericModalContainer.innerHTML = `
+                        <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[10000]">
+                            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 max-h-[80vh] overflow-y-auto">
+                                <h2 class="text-2xl font-bold text-white mb-4">${title}</h2>
+                                <div class="text-gray-300 mb-6 space-y-2">${content}</div>
+                                <div class="flex justify-end">
+                                    <button id="modal-close" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button>
+                                </div>
+                            </div>
+                        </div>`;
+                    document.getElementById('modal-close').onclick = () => this.elements.genericModalContainer.innerHTML = '';
+                },
+                validateLink(link) { return link && (link.startsWith('http://') || link.startsWith('https://')); },
+                copyToClipboard(text) {
+                    if (!navigator.clipboard) { this.showNotification("Clipboard not supported on this browser.", 'error'); return; }
+                    navigator.clipboard.writeText(text).then(() => { this.showNotification("Copied to clipboard!"); }, () => { this.showNotification("Failed to copy.", 'error'); });
+                },
+                showNotification(message, type = 'success') {
+                    const el = this.elements.notification;
+                    el.textContent = message;
+                    el.className = `notification-toast fixed bottom-5 right-5 text-white py-3 px-5 rounded-lg shadow-xl z-[10001] ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+                    setTimeout(() => el.classList.add('hidden'), 4000);
+                }
+            };
+
+            app.init();
+        });
+    </script>
 </body>
 </html>
